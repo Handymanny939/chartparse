@@ -35,7 +35,7 @@ def parse_note(request: NoteRequest):
             {
                 "role": "user",
                 "content": f"""You are a medical data extraction assistant. 
-Extract the following from this clinical note and return ONLY valid JSON, no explanation:
+Extract the following from this clinical note and return ONLY valid JSON, no explanation, no markdown, no code fences:
 - patient_name
 - date_of_visit
 - chief_complaint
@@ -49,4 +49,10 @@ Clinical note:
             }
         ]
     )
-    return {"result": message.content[0].text}
+    raw = message.content[0].text
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1]
+    if cleaned.endswith("```"):
+        cleaned = cleaned.rsplit("```", 1)[0]
+    return {"result": cleaned.strip()}

@@ -1,122 +1,89 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from "react";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [note, setNote] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleParse = async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const response = await fetch("http://localhost:8000/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note }),
+      });
+      const data = await response.json();
+      setResult(JSON.parse(data.result));
+    } catch (err) {
+      setError("Failed to parse note. Make sure the server is running.");
+    }
+    setLoading(false);
+  };
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem", fontFamily: "sans-serif" }}>
+      <h1 style={{ color: "#2563eb" }}>ChartParse</h1>
+      <p style={{ color: "#6b7280" }}>AI-powered clinical note parser for solo practices</p>
 
-      <div className="ticks"></div>
+      <textarea
+        rows={10}
+        style={{ width: "100%", padding: "1rem", fontSize: "14px", borderRadius: "8px", border: "1px solid #d1d5db" }}
+        placeholder="Paste your clinical note here..."
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      <button
+        onClick={handleParse}
+        disabled={loading || !note}
+        style={{ marginTop: "1rem", padding: "0.75rem 2rem", backgroundColor: "#2563eb", color: "white", border: "none", borderRadius: "8px", fontSize: "16px", cursor: "pointer" }}
+      >
+        {loading ? "Parsing..." : "Parse Note"}
+      </button>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {error && <p style={{ color: "red", marginTop: "1rem" }}>{error}</p>}
+
+      {result && (
+        <div style={{ marginTop: "2rem" }}>
+          <h2>Extracted Data</h2>
+
+          <div style={{ background: "#f0f9ff", padding: "1rem", borderRadius: "8px", marginBottom: "1rem" }}>
+            <h3>Patient Info</h3>
+            <p><strong>Name:</strong> {result.patient_name}</p>
+            <p><strong>Date of Visit:</strong> {result.date_of_visit}</p>
+            <p><strong>Chief Complaint:</strong> {result.chief_complaint}</p>
+          </div>
+
+          <div style={{ background: "#f0fdf4", padding: "1rem", borderRadius: "8px", marginBottom: "1rem" }}>
+            <h3>Vitals</h3>
+            <p><strong>Blood Pressure:</strong> {result.vitals?.blood_pressure}</p>
+            <p><strong>Heart Rate:</strong> {result.vitals?.heart_rate}</p>
+            <p><strong>Temperature:</strong> {result.vitals?.temperature}</p>
+            <p><strong>Weight:</strong> {result.vitals?.weight}</p>
+          </div>
+
+          <div style={{ background: "#fefce8", padding: "1rem", borderRadius: "8px", marginBottom: "1rem" }}>
+            <h3>Diagnoses</h3>
+            <ul>{result.diagnoses?.map((d, i) => <li key={i}>{d}</li>)}</ul>
+          </div>
+
+          <div style={{ background: "#fdf4ff", padding: "1rem", borderRadius: "8px", marginBottom: "1rem" }}>
+            <h3>Medications</h3>
+            <ul>{result.medications?.map((m, i) => <li key={i}>{m}</li>)}</ul>
+          </div>
+
+          <div style={{ background: "#fff7ed", padding: "1rem", borderRadius: "8px" }}>
+            <h3>Follow Up</h3>
+            <p>{result.follow_up}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
