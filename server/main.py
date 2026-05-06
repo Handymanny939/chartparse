@@ -40,7 +40,7 @@ Extract the following from this clinical note and return ONLY valid JSON, no exp
 - date_of_visit
 - chief_complaint
 - vitals (blood_pressure, heart_rate, temperature, weight)
-- diagnoses (list)
+- diagnoses: a list of objects, each with "name" and "icd10" fields (e.g. {{"name": "Acute bronchitis", "icd10": "J20.9"}})
 - medications (list)
 - follow_up
 

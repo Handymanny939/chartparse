@@ -37,7 +37,6 @@ const styles = {
     border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "15px",
     cursor: "pointer"
   },
-  spinner: { display: "inline-block", marginRight: "0.5rem" },
   error: {
     marginTop: "1rem", padding: "0.85rem 1rem", background: "#fef2f2",
     border: "1px solid #fecaca", borderRadius: "8px", color: "#dc2626", fontSize: "14px"
@@ -175,7 +174,16 @@ export default function App() {
 
               <Card title="Diagnoses" color="#d97706">
                 {result.diagnoses?.map((d, i) => (
-                  <span key={i} style={{ ...styles.tag, background: "#fef3c7", color: "#92400e" }}>{d}</span>
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+                    <span style={{ ...styles.tag, background: "#fef3c7", color: "#92400e" }}>
+                      {typeof d === "object" ? d.name : d}
+                    </span>
+                    {typeof d === "object" && d.icd10 && (
+                      <span style={{ ...styles.tag, background: "#f0f9ff", color: "#1e40af", fontFamily: "monospace", fontSize: "12px" }}>
+                        {d.icd10}
+                      </span>
+                    )}
+                  </div>
                 ))}
               </Card>
 
