@@ -1,5 +1,16 @@
 import { useState } from "react";
 
+const SAMPLE_NOTES = {
+  "Acute Bronchitis": `Patient: John Smith, DOB: 03/15/1970. Visit Date: 05/01/2026. Chief Complaint: Persistent cough and shortness of breath for 5 days. Vitals: BP 138/88, HR 92, Temp 99.8F, Weight 185lbs. Assessment: 1. Acute bronchitis 2. Mild hypertension. Plan: Prescribed Azithromycin 500mg for 5 days, Albuterol inhaler as needed. Follow up in 2 weeks if symptoms persist.`,
+
+  "Type 2 Diabetes": `Patient: Maria Garcia, DOB: 07/22/1965. Visit Date: 05/01/2026. Chief Complaint: Routine diabetes follow-up, fatigue and increased thirst. Vitals: BP 142/90, HR 78, Temp 98.4F, Weight 210lbs. Assessment: 1. Type 2 diabetes mellitus, uncontrolled 2. Hypertension. Plan: Increase Metformin to 1000mg twice daily, continue Lisinopril 10mg, recheck HbA1c in 3 months. Follow up in 6 weeks.`,
+
+  "Chest Pain": `Patient: Robert Johnson, DOB: 11/03/1958. Visit Date: 05/01/2026. Chief Complaint: Intermittent chest pain and shortness of breath for 2 days. Vitals: BP 155/95, HR 88, Temp 98.6F, Weight 220lbs. Assessment: 1. Unstable angina 2. Hyperlipidemia. Plan: Prescribed Nitroglycerin 0.4mg sublingual PRN, Atorvastatin 40mg daily. EKG ordered, cardiology referral placed. Follow up in 48 hours or sooner if symptoms worsen.`,
+
+  "Upper Respiratory": `Patient: Emily Chen, DOB: 04/18/1990. Visit Date: 05/01/2026. Chief Complaint: Sore throat, runny nose, mild fever for 3 days. Vitals: BP 118/76, HR 82, Temp 100.2F, Weight 135lbs. Assessment: 1. Acute upper respiratory infection 2. Pharyngitis. Plan: Rest, fluids, Ibuprofen 400mg every 6 hours as needed for fever and pain. No antibiotics indicated at this time. Follow up if symptoms worsen or persist beyond 7 days.`,
+
+  "Back Pain": `Patient: Michael Torres, DOB: 09/30/1982. Visit Date: 05/01/2026. Chief Complaint: Lower back pain radiating to left leg after lifting at work 4 days ago. Vitals: BP 124/80, HR 74, Temp 98.4F, Weight 195lbs. Assessment: 1. Lumbar radiculopathy 2. Muscle strain. Plan: Prescribed Cyclobenzaprine 5mg at bedtime, Naproxen 500mg twice daily. Physical therapy referral placed. Follow up in 2 weeks.`
+};
 const styles = {
   app: { minHeight: "100vh", background: "#f8fafc" },
   header: {
@@ -113,6 +124,15 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleSampleLoad = (e) => {
+    const selected = e.target.value;
+    if (selected) {
+      setNote(SAMPLE_NOTES[selected]);
+      setResult(null);
+      setError(null);
+    }
+  };
+
   return (
     <div style={styles.app}>
       <header style={styles.header}>
@@ -123,7 +143,19 @@ export default function App() {
       </header>
 
       <main style={styles.main}>
-        <label style={styles.label}>Paste Clinical Note</label>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+          <label style={{ ...styles.label, marginBottom: 0 }}>Paste Clinical Note</label>
+          <select
+            onChange={handleSampleLoad}
+            defaultValue=""
+            style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "13px", color: "#374151", background: "white", cursor: "pointer" }}
+          >
+            <option value="" disabled>Load sample note...</option>
+            {Object.keys(SAMPLE_NOTES).map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
         <textarea
           rows={10}
           style={styles.textarea}
