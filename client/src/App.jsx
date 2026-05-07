@@ -124,6 +124,33 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleDownloadCSV = () => {
+    const rows = [
+      ["Field", "Value"],
+      ["Patient Name", result.patient_name],
+      ["Date of Visit", result.date_of_visit],
+      ["Chief Complaint", result.chief_complaint],
+      ["Blood Pressure", result.vitals?.blood_pressure],
+      ["Heart Rate", result.vitals?.heart_rate],
+      ["Temperature", result.vitals?.temperature],
+      ["Weight", result.vitals?.weight],
+      ...result.diagnoses?.map((d) => [
+        "Diagnosis",
+        typeof d === "object" ? `${d.name} (${d.icd10})` : d
+      ]),
+      ...result.medications?.map((m) => ["Medication", m]),
+      ["Follow Up", result.follow_up],
+    ];
+    const csv = rows.map((r) => r.map((v) => `"${v ?? ""}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${result.patient_name?.replace(/\s+/g, "_") ?? "chart"}_parsed.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleSampleLoad = (e) => {
     const selected = e.target.value;
     if (selected) {
@@ -185,9 +212,14 @@ export default function App() {
           <>
             <div style={styles.resultsHeader}>
               <h2 style={styles.resultsTitle}>Extracted Data</h2>
-              <button onClick={handleCopy} style={styles.copyBtn}>
-                {copied ? "✓ Copied!" : "Copy JSON"}
-              </button>
+               <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button onClick={handleCopy} style={styles.copyBtn}>
+                  {copied ? "✓ Copied!" : "Copy JSON"}
+                </button>
+                <button onClick={handleDownloadCSV} style={{ ...styles.copyBtn, background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>
+                  ↓ Download CSV
+                </button>
+              </div>
             </div>
 
             <div style={styles.grid}>
