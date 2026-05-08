@@ -144,6 +144,7 @@ export default function App() {
         typeof d === "object" ? `${d.name} (${d.icd10})` : d
       ]),
       ...result.medications?.map((m) => ["Medication", m]),
+      ...result.cpt_codes?.map((c) => ["CPT Code", `${c.code} — ${c.description}`]) ?? [],
       ["Follow Up", result.follow_up],
     ];
     const csv = rows.map((r) => r.map((v) => `"${v ?? ""}"`).join(",")).join("\n");
@@ -270,6 +271,19 @@ export default function App() {
                   <span key={i} style={{ ...styles.tag, background: "#f3e8ff", color: "#6b21a8" }}>{m}</span>
                 ))}
               </Card>
+
+              {result.cpt_codes?.length > 0 && (
+                <Card title="CPT Codes" color="#dc2626" full>
+                  {result.cpt_codes?.map((c, i) => (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
+                      <span style={{ ...styles.tag, background: "#fef2f2", color: "#991b1b", fontFamily: "monospace", fontSize: "13px", fontWeight: "700" }}>
+                        {c.code}
+                      </span>
+                      <span style={{ fontSize: "14px", color: "#374151" }}>{c.description}</span>
+                    </div>
+                  ))}
+                </Card>
+              )}
 
               <Card title="Follow Up" color="#0891b2" full>
                 <p style={{ fontSize: "14px", color: "#374151" }}>{result.follow_up}</p>

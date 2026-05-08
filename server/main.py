@@ -41,6 +41,7 @@ Extract the following from this clinical note and return ONLY valid JSON, no exp
 - chief_complaint
 - vitals (blood_pressure, heart_rate, temperature, weight)
 - diagnoses: a list of objects, each with "name" and "icd10" fields (e.g. {{"name": "Acute bronchitis", "icd10": "J20.9"}})
+- cpt_codes: a list of objects, each with "code" and "description" fields representing the most likely procedure codes billed for this visit (e.g. {{"code": "99213", "description": "Office visit, established patient, moderate complexity"}})
 - medications (list)
 - follow_up
 
