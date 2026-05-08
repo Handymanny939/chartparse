@@ -1,5 +1,7 @@
 import { useState } from "react";
-
+import { auth } from "./firebase";
+import { signOut } from "firebase/auth";
+import { useAuthState } from "react-firebase-hooks/auth";
 const SAMPLE_NOTES = {
   "Acute Bronchitis": `Patient: John Smith, DOB: 03/15/1970. Visit Date: 05/01/2026. Chief Complaint: Persistent cough and shortness of breath for 5 days. Vitals: BP 138/88, HR 92, Temp 99.8F, Weight 185lbs. Assessment: 1. Acute bronchitis 2. Mild hypertension. Plan: Prescribed Azithromycin 500mg for 5 days, Albuterol inhaler as needed. Follow up in 2 weeks if symptoms persist.`,
 
@@ -99,6 +101,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [user] = useAuthState(auth);
 
   const handleParse = async () => {
     setLoading(true);
@@ -117,6 +120,8 @@ export default function App() {
     }
     setLoading(false);
   };
+
+  const handleSignOut = () => signOut(auth);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(JSON.stringify(result, null, 2));
@@ -167,6 +172,15 @@ export default function App() {
           <h1 style={styles.logo}>⚕ ChartParse</h1>
         </div>
         <p style={styles.tagline}>AI-powered clinical note parser for solo practices</p>
+        {user && (
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            {user.photoURL && <img src={user.photoURL} alt="avatar" style={{ width: "32px", height: "32px", borderRadius: "50%" }} />}
+            <span style={{ fontSize: "14px", color: "#374151" }}>{user.displayName}</span>
+            <button onClick={handleSignOut} style={{ padding: "0.4rem 1rem", background: "white", border: "1px solid #e2e8f0", borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b" }}>
+              Sign out
+            </button>
+          </div>
+        )}
       </header>
 
       <main style={styles.main}>
