@@ -149,3 +149,5 @@ node_modules/
 venv/
 
 client/node_modules/
+
+client/.env
