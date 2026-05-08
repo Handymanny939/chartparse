@@ -1,8 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import anthropic
+import pymupdf
 import os
 
 load_dotenv()
@@ -22,12 +23,7 @@ client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 class NoteRequest(BaseModel):
     note: str
 
-@app.get("/")
-def root():
-    return {"message": "ChartParse API is running"}
-
-@app.post("/parse")
-def parse_note(request: NoteRequest):
+def parse_with_claude(note_text: str):
     message = client.messages.create(
         model="claude-sonnet-4-5",
         max_tokens=1024,
@@ -46,7 +42,7 @@ Extract the following from this clinical note and return ONLY valid JSON, no exp
 - follow_up
 
 Clinical note:
-{request.note}"""
+{note_text}"""
             }
         ]
     )
@@ -56,4 +52,24 @@ Clinical note:
         cleaned = cleaned.split("\n", 1)[1]
     if cleaned.endswith("```"):
         cleaned = cleaned.rsplit("```", 1)[0]
-    return {"result": cleaned.strip()}
+    return cleaned.strip()
+
+@app.get("/")
+def root():
+    return {"message": "ChartParse API is running"}
+
+@app.post("/parse")
+def parse_note(request: NoteRequest):
+    result = parse_with_claude(request.note)
+    return {"result": result}
+
+@app.post("/parse-pdf")
+async def parse_pdf(file: UploadFile = File(...)):
+    contents = await file.read()
+    doc = pymupdf.open(stream=contents, filetype="pdf")
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    doc.close()
+    result = parse_with_claude(text)
+    return {"result": result}

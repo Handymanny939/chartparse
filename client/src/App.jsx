@@ -157,6 +157,27 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
+  const handlePDFUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("http://localhost:8000/parse-pdf", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      setResult(JSON.parse(data.result));
+    } catch (err) {
+      setError("Could not parse the PDF. Make sure the server is running.");
+    }
+    setLoading(false);
+  };
+
   const handleSampleLoad = (e) => {
     const selected = e.target.value;
     if (selected) {
@@ -214,6 +235,16 @@ export default function App() {
           >
             {loading ? "⏳ Parsing..." : "Parse Note"}
           </button>
+          <label style={{ ...styles.clearBtn, cursor: "pointer", display: "inline-block" }}>
+            📄 Upload PDF
+            <input
+              type="file"
+              accept=".pdf"
+              style={{ display: "none" }}
+              onChange={handlePDFUpload}
+              disabled={loading}
+            />
+          </label>
           {note && (
             <button onClick={() => { setNote(""); setResult(null); setError(null); }} style={styles.clearBtn}>
               Clear
