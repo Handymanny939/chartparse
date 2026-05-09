@@ -20,11 +20,12 @@ const styles = {
   header: {
     background: "white",
     borderBottom: "1px solid #e2e8f0",
-    padding: "1rem 2rem",
+    padding: "0.75rem 1rem",
     display: "flex",
     alignItems: "center",
-    gap: "0.75rem",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.06)"
+    gap: "0.5rem",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+    flexWrap: "wrap"
   },
   logo: { fontSize: "22px", fontWeight: "700", color: "#2563eb", margin: 0 },
   tagline: { fontSize: "13px", color: "#94a3b8", margin: 0 },
@@ -66,9 +67,9 @@ const styles = {
     borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b",
     fontWeight: "500"
   },
-  grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" },
   card: { background: "white", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #f1f5f9" },
-  cardFull: { background: "white", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #f1f5f9", gridColumn: "span 2" },
+  cardFull: { background: "white", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #f1f5f9", gridColumn: "1 / -1" },
   cardTitle: { fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.85rem" },
   field: { marginBottom: "0.5rem", fontSize: "14px", color: "#374151" },
   fieldLabel: { fontWeight: "600", color: "#64748b", fontSize: "13px" },

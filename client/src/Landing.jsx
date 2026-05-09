@@ -17,7 +17,7 @@ export default function Landing() {
         <div style={{ display: "inline-block", background: "#eff6ff", color: "#2563eb", padding: "0.35rem 1rem", borderRadius: "99px", fontSize: "13px", fontWeight: "600", marginBottom: "1.5rem" }}>
           Built for solo medical practices
         </div>
-        <h1 style={{ fontSize: "52px", fontWeight: "800", color: "#0f172a", margin: "0 0 1.25rem", lineHeight: "1.15", letterSpacing: "-1.5px" }}>
+        <h1 style={{ fontSize: "clamp(28px, 6vw, 52px)", fontWeight: "800", color: "#0f172a", margin: "0 0 1.25rem", lineHeight: "1.15", letterSpacing: "-1.5px" }}>
           Turn clinical notes into
           <br />
           <span style={{ color: "#2563eb" }}>structured data instantly</span>
@@ -35,7 +35,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section style={{ maxWidth: "900px", margin: "0 auto", padding: "2rem 1.5rem 5rem", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1.5rem" }}>
+      <section style={{ maxWidth: "900px", margin: "0 auto", padding: "2rem 1.5rem 5rem", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1.5rem" }}>
         <div style={{ background: "#f8fafc", borderRadius: "12px", padding: "1.5rem", border: "1px solid #e2e8f0" }}>
           <div style={{ fontSize: "28px", marginBottom: "0.75rem" }}>⚡</div>
           <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#0f172a", margin: "0 0 0.5rem" }}>Parse in seconds</h3>
