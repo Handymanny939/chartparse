@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 import { signOut } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { useEffect } from "react";
 const SAMPLE_NOTES = {
   "Acute Bronchitis": `Patient: John Smith, DOB: 03/15/1970. Visit Date: 05/01/2026. Chief Complaint: Persistent cough and shortness of breath for 5 days. Vitals: BP 138/88, HR 92, Temp 99.8F, Weight 185lbs. Assessment: 1. Acute bronchitis 2. Mild hypertension. Plan: Prescribed Azithromycin 500mg for 5 days, Albuterol inhaler as needed. Follow up in 2 weeks if symptoms persist.`,
 
@@ -102,6 +104,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [user] = useAuthState(auth);
+  const [history, setHistory] = useState([]);
 
   const handleParse = async () => {
     setLoading(true);
@@ -114,7 +117,15 @@ export default function App() {
         body: JSON.stringify({ note }),
       });
       const data = await response.json();
-      setResult(JSON.parse(data.result));
+      const parsed = JSON.parse(data.result);
+      setResult(parsed);
+      if (user) {
+        await addDoc(collection(db, "parses"), {
+          uid: user.uid,
+          result: parsed,
+          createdAt: serverTimestamp(),
+        });
+      }
     } catch (err) {
       setError("Could not parse the note. Make sure the server is running at localhost:8000.");
     }
@@ -122,6 +133,19 @@ export default function App() {
   };
 
   const handleSignOut = () => signOut(auth);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, "parses"),
+      where("uid", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [user]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(JSON.stringify(result, null, 2));
@@ -171,7 +195,15 @@ export default function App() {
         body: formData,
       });
       const data = await response.json();
-      setResult(JSON.parse(data.result));
+      const parsed = JSON.parse(data.result);
+      setResult(parsed);
+      if (user) {
+        await addDoc(collection(db, "parses"), {
+          uid: user.uid,
+          result: parsed,
+          createdAt: serverTimestamp(),
+        });
+      }
     } catch (err) {
       setError("Could not parse the PDF. Make sure the server is running.");
     }
@@ -323,6 +355,24 @@ export default function App() {
           </>
         )}
       </main>
+
+      {history.length > 0 && (
+        <aside style={{ maxWidth: "860px", margin: "0 auto", padding: "0 1.5rem 3rem" }}>
+          <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1e293b", marginBottom: "0.75rem" }}>Recent Parses</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {history.slice(0, 10).map((h) => (
+              <div
+                key={h.id}
+                onClick={() => setResult(h.result)}
+                style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem 1rem", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <span style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>{h.result?.patient_name ?? "Unknown"}</span>
+                <span style={{ fontSize: "12px", color: "#94a3b8" }}>{h.result?.date_of_visit ?? ""}</span>
+              </div>
+            ))}
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
