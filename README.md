@@ -2,7 +2,8 @@
 
 AI-powered clinical note parser for solo medical practices. Paste or upload a SOAP note and get back structured patient data, ICD-10 diagnosis codes, CPT billing codes, and medications — in seconds.
 
-**Live demo:** [coming soon]
+**Live demo:** [chartparse.vercel.app](https://chartparse.vercel.app)  
+**API:** [chartparse-production.up.railway.app](https://chartparse-production.up.railway.app)
 
 ---
 
