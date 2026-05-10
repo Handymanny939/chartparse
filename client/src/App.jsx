@@ -112,7 +112,7 @@ export default function App() {
     setError(null);
     setResult(null);
     try {
-      const response = await fetch("http://localhost:8000/parse", {
+      const response = await fetch("https://chartparse-production.up.railway.app/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note }),
@@ -128,7 +128,7 @@ export default function App() {
         });
       }
     } catch (err) {
-      setError("Could not parse the note. Make sure the server is running at localhost:8000.");
+      setError("Could not parse the note. Please try again.");
     }
     setLoading(false);
   };
@@ -191,7 +191,7 @@ export default function App() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await fetch("http://localhost:8000/parse-pdf", {
+      const response = await fetch("https://chartparse-production.up.railway.app/parse-pdf", {
         method: "POST",
         body: formData,
       });
