@@ -1,20 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { auth, db } from "./firebase";
 import { signOut } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
-import { useEffect } from "react";
+
 const SAMPLE_NOTES = {
   "Acute Bronchitis": `Patient: John Smith, DOB: 03/15/1970. Visit Date: 05/01/2026. Chief Complaint: Persistent cough and shortness of breath for 5 days. Vitals: BP 138/88, HR 92, Temp 99.8F, Weight 185lbs. Assessment: 1. Acute bronchitis 2. Mild hypertension. Plan: Prescribed Azithromycin 500mg for 5 days, Albuterol inhaler as needed. Follow up in 2 weeks if symptoms persist.`,
-
   "Type 2 Diabetes": `Patient: Maria Garcia, DOB: 07/22/1965. Visit Date: 05/01/2026. Chief Complaint: Routine diabetes follow-up, fatigue and increased thirst. Vitals: BP 142/90, HR 78, Temp 98.4F, Weight 210lbs. Assessment: 1. Type 2 diabetes mellitus, uncontrolled 2. Hypertension. Plan: Increase Metformin to 1000mg twice daily, continue Lisinopril 10mg, recheck HbA1c in 3 months. Follow up in 6 weeks.`,
-
   "Chest Pain": `Patient: Robert Johnson, DOB: 11/03/1958. Visit Date: 05/01/2026. Chief Complaint: Intermittent chest pain and shortness of breath for 2 days. Vitals: BP 155/95, HR 88, Temp 98.6F, Weight 220lbs. Assessment: 1. Unstable angina 2. Hyperlipidemia. Plan: Prescribed Nitroglycerin 0.4mg sublingual PRN, Atorvastatin 40mg daily. EKG ordered, cardiology referral placed. Follow up in 48 hours or sooner if symptoms worsen.`,
-
   "Upper Respiratory": `Patient: Emily Chen, DOB: 04/18/1990. Visit Date: 05/01/2026. Chief Complaint: Sore throat, runny nose, mild fever for 3 days. Vitals: BP 118/76, HR 82, Temp 100.2F, Weight 135lbs. Assessment: 1. Acute upper respiratory infection 2. Pharyngitis. Plan: Rest, fluids, Ibuprofen 400mg every 6 hours as needed for fever and pain. No antibiotics indicated at this time. Follow up if symptoms worsen or persist beyond 7 days.`,
-
   "Back Pain": `Patient: Michael Torres, DOB: 09/30/1982. Visit Date: 05/01/2026. Chief Complaint: Lower back pain radiating to left leg after lifting at work 4 days ago. Vitals: BP 124/80, HR 74, Temp 98.4F, Weight 195lbs. Assessment: 1. Lumbar radiculopathy 2. Muscle strain. Plan: Prescribed Cyclobenzaprine 5mg at bedtime, Naproxen 500mg twice daily. Physical therapy referral placed. Follow up in 2 weeks.`
 };
+
 const styles = {
   app: { minHeight: "100vh", background: "#f8fafc" },
   header: {
@@ -77,7 +74,24 @@ const styles = {
     display: "inline-block", padding: "0.25rem 0.65rem",
     borderRadius: "99px", fontSize: "13px", fontWeight: "500", margin: "0.2rem"
   },
+  skeletonLine: {
+    borderRadius: "4px",
+    background: "linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)",
+    backgroundSize: "200% 100%",
+    animation: "shimmer 1.5s infinite",
+  },
 };
+
+function SkeletonCard({ full }) {
+  return (
+    <div style={{ ...(full ? styles.cardFull : styles.card), overflow: "hidden" }}>
+      <div style={{ ...styles.skeletonLine, height: "10px", width: "40%", marginBottom: "1rem" }} />
+      <div style={{ ...styles.skeletonLine, height: "14px", width: "80%", marginBottom: "0.5rem" }} />
+      <div style={{ ...styles.skeletonLine, height: "14px", width: "60%", marginBottom: "0.5rem" }} />
+      <div style={{ ...styles.skeletonLine, height: "14px", width: "70%" }} />
+    </div>
+  );
+}
 
 function Card({ title, color, children, full }) {
   return (
@@ -206,7 +220,7 @@ export default function App() {
         });
       }
     } catch (err) {
-      setError("Could not parse the PDF. Make sure the server is running.");
+      setError("Could not parse the PDF. Please try again.");
     }
     setLoading(false);
   };
@@ -252,6 +266,7 @@ export default function App() {
             ))}
           </select>
         </div>
+
         <textarea
           rows={10}
           style={styles.textarea}
@@ -287,11 +302,26 @@ export default function App() {
 
         {error && <div style={styles.error}>⚠ {error}</div>}
 
+        {loading && (
+          <>
+            <div style={{ ...styles.resultsHeader, marginTop: "2rem" }}>
+              <div style={{ ...styles.skeletonLine, height: "18px", width: "150px" }} />
+            </div>
+            <div style={styles.grid}>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard full />
+            </div>
+          </>
+        )}
+
         {result && (
           <>
             <div style={styles.resultsHeader}>
               <h2 style={styles.resultsTitle}>Extracted Data</h2>
-               <div style={{ display: "flex", gap: "0.5rem" }}>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
                 <button onClick={handleCopy} style={styles.copyBtn}>
                   {copied ? "✓ Copied!" : "Copy JSON"}
                 </button>
