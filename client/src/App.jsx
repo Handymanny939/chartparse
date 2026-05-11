@@ -64,6 +64,21 @@ const styles = {
     borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b",
     fontWeight: "500"
   },
+  editBtn: {
+    padding: "0.5rem 1rem", background: "#eff6ff", border: "1px solid #bfdbfe",
+    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#2563eb",
+    fontWeight: "600"
+  },
+  saveBtn: {
+    padding: "0.5rem 1rem", background: "#2563eb", border: "none",
+    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "white",
+    fontWeight: "600"
+  },
+  cancelBtn: {
+    padding: "0.5rem 1rem", background: "white", border: "1px solid #e2e8f0",
+    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b",
+    fontWeight: "500"
+  },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" },
   card: { background: "white", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #f1f5f9" },
   cardFull: { background: "white", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #f1f5f9", gridColumn: "1 / -1" },
@@ -73,6 +88,34 @@ const styles = {
   tag: {
     display: "inline-block", padding: "0.25rem 0.65rem",
     borderRadius: "99px", fontSize: "13px", fontWeight: "500", margin: "0.2rem"
+  },
+  editInput: {
+    fontSize: "14px", border: "1px solid #e2e8f0", borderRadius: "6px",
+    padding: "0.25rem 0.5rem", fontFamily: "inherit", background: "#f8fafc",
+    outline: "none", transition: "border 0.2s", width: "100%", marginTop: "0.2rem",
+    boxSizing: "border-box"
+  },
+  editTextarea: {
+    fontSize: "14px", border: "1px solid #e2e8f0", borderRadius: "6px",
+    padding: "0.5rem", fontFamily: "inherit", background: "#f8fafc",
+    outline: "none", width: "100%", resize: "vertical", marginTop: "0.2rem",
+    boxSizing: "border-box", lineHeight: "1.5"
+  },
+  removeBtn: {
+    background: "none", border: "none", cursor: "pointer",
+    color: "#ef4444", fontSize: "16px", padding: "0 0.25rem", lineHeight: 1,
+    flexShrink: 0
+  },
+  addBtn: {
+    marginTop: "0.5rem", padding: "0.3rem 0.75rem", background: "white",
+    border: "1px dashed #cbd5e1", borderRadius: "6px", fontSize: "13px",
+    cursor: "pointer", color: "#64748b", display: "block", width: "100%",
+    textAlign: "left"
+  },
+  editingBanner: {
+    background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px",
+    padding: "0.6rem 1rem", fontSize: "13px", color: "#1d4ed8",
+    marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem"
   },
   skeletonLine: {
     borderRadius: "4px",
@@ -102,12 +145,21 @@ function Card({ title, color, children, full }) {
   );
 }
 
-function Field({ label, value }) {
-  if (!value) return null;
+// Renders a labeled field — static when not editing, input when editing
+function Field({ label, value, editable, onChange }) {
+  if (!editable && !value) return null;
   return (
     <div style={styles.field}>
-      <span style={styles.fieldLabel}>{label}: </span>
-      {value}
+      <span style={styles.fieldLabel}>{label}</span>
+      {editable ? (
+        <input
+          style={styles.editInput}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <span style={{ marginLeft: "0.25rem" }}>{value}</span>
+      )}
     </div>
   );
 }
@@ -121,10 +173,117 @@ export default function App() {
   const [user] = useAuthState(auth);
   const [history, setHistory] = useState([]);
 
+  // --- Edit state ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedResult, setEditedResult] = useState(null);
+
+  // The data currently displayed (live edit copy while editing, committed result otherwise)
+  const display = isEditing ? editedResult : result;
+
+  const handleEditStart = () => {
+    setEditedResult(JSON.parse(JSON.stringify(result)));
+    setIsEditing(true);
+  };
+
+  const handleEditSave = () => {
+    setResult(editedResult);
+    setIsEditing(false);
+    setEditedResult(null);
+  };
+
+  const handleEditCancel = () => {
+    setIsEditing(false);
+    setEditedResult(null);
+  };
+
+  // Update a simple top-level or nested field: path like "patient_name" or "vitals.blood_pressure"
+  const updateField = (path, value) => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      const parts = path.split(".");
+      let obj = next;
+      for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+      obj[parts[parts.length - 1]] = value;
+      return next;
+    });
+  };
+
+  // --- Diagnosis helpers ---
+  const updateDiagnosis = (i, field, value) => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.diagnoses[i] = { ...next.diagnoses[i], [field]: value };
+      return next;
+    });
+  };
+  const removeDiagnosis = (i) => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.diagnoses.splice(i, 1);
+      return next;
+    });
+  };
+  const addDiagnosis = () => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.diagnoses = [...(next.diagnoses ?? []), { name: "", icd10: "" }];
+      return next;
+    });
+  };
+
+  // --- Medication helpers ---
+  const updateMedication = (i, value) => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.medications[i] = value;
+      return next;
+    });
+  };
+  const removeMedication = (i) => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.medications.splice(i, 1);
+      return next;
+    });
+  };
+  const addMedication = () => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.medications = [...(next.medications ?? []), ""];
+      return next;
+    });
+  };
+
+  // --- CPT code helpers ---
+  const updateCpt = (i, field, value) => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.cpt_codes[i] = { ...next.cpt_codes[i], [field]: value };
+      return next;
+    });
+  };
+  const removeCpt = (i) => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.cpt_codes.splice(i, 1);
+      return next;
+    });
+  };
+  const addCpt = () => {
+    setEditedResult((prev) => {
+      const next = JSON.parse(JSON.stringify(prev));
+      next.cpt_codes = [...(next.cpt_codes ?? []), { code: "", description: "" }];
+      return next;
+    });
+  };
+
+  // --- Existing handlers ---
   const handleParse = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setIsEditing(false);
+    setEditedResult(null);
     try {
       const response = await fetch("https://chartparse-production.up.railway.app/parse", {
         method: "POST",
@@ -202,6 +361,8 @@ export default function App() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setIsEditing(false);
+    setEditedResult(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -231,6 +392,8 @@ export default function App() {
       setNote(SAMPLE_NOTES[selected]);
       setResult(null);
       setError(null);
+      setIsEditing(false);
+      setEditedResult(null);
     }
   };
 
@@ -294,7 +457,7 @@ export default function App() {
             />
           </label>
           {note && (
-            <button onClick={() => { setNote(""); setResult(null); setError(null); }} style={styles.clearBtn}>
+            <button onClick={() => { setNote(""); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); }} style={styles.clearBtn}>
               Clear
             </button>
           )}
@@ -317,70 +480,201 @@ export default function App() {
           </>
         )}
 
-        {result && (
+        {display && (
           <>
             <div style={styles.resultsHeader}>
               <h2 style={styles.resultsTitle}>Extracted Data</h2>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <button onClick={handleCopy} style={styles.copyBtn}>
-                  {copied ? "✓ Copied!" : "Copy JSON"}
-                </button>
-                <button onClick={handleDownloadCSV} style={{ ...styles.copyBtn, background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>
-                  ↓ Download CSV
-                </button>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                {!isEditing ? (
+                  <>
+                    <button onClick={handleEditStart} style={styles.editBtn}>
+                      ✏ Edit Results
+                    </button>
+                    <button onClick={handleCopy} style={styles.copyBtn}>
+                      {copied ? "✓ Copied!" : "Copy JSON"}
+                    </button>
+                    <button onClick={handleDownloadCSV} style={{ ...styles.copyBtn, background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>
+                      ↓ Download CSV
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={handleEditSave} style={styles.saveBtn}>
+                      ✓ Save Changes
+                    </button>
+                    <button onClick={handleEditCancel} style={styles.cancelBtn}>
+                      Cancel
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
+            {isEditing && (
+              <div style={styles.editingBanner}>
+                ✏ Editing mode — correct any AI mistakes, then click Save Changes.
+              </div>
+            )}
+
             <div style={styles.grid}>
+              {/* Patient Info */}
               <Card title="Patient Info" color="#2563eb">
-                <Field label="Name" value={result.patient_name} />
-                <Field label="Date of Visit" value={result.date_of_visit} />
-                <Field label="Chief Complaint" value={result.chief_complaint} />
+                <Field
+                  label="Name"
+                  value={display.patient_name}
+                  editable={isEditing}
+                  onChange={(v) => updateField("patient_name", v)}
+                />
+                <Field
+                  label="Date of Visit"
+                  value={display.date_of_visit}
+                  editable={isEditing}
+                  onChange={(v) => updateField("date_of_visit", v)}
+                />
+                <Field
+                  label="Chief Complaint"
+                  value={display.chief_complaint}
+                  editable={isEditing}
+                  onChange={(v) => updateField("chief_complaint", v)}
+                />
               </Card>
 
+              {/* Vitals */}
               <Card title="Vitals" color="#16a34a">
-                <Field label="Blood Pressure" value={result.vitals?.blood_pressure} />
-                <Field label="Heart Rate" value={result.vitals?.heart_rate} />
-                <Field label="Temperature" value={result.vitals?.temperature} />
-                <Field label="Weight" value={result.vitals?.weight} />
+                <Field
+                  label="Blood Pressure"
+                  value={display.vitals?.blood_pressure}
+                  editable={isEditing}
+                  onChange={(v) => updateField("vitals.blood_pressure", v)}
+                />
+                <Field
+                  label="Heart Rate"
+                  value={display.vitals?.heart_rate}
+                  editable={isEditing}
+                  onChange={(v) => updateField("vitals.heart_rate", v)}
+                />
+                <Field
+                  label="Temperature"
+                  value={display.vitals?.temperature}
+                  editable={isEditing}
+                  onChange={(v) => updateField("vitals.temperature", v)}
+                />
+                <Field
+                  label="Weight"
+                  value={display.vitals?.weight}
+                  editable={isEditing}
+                  onChange={(v) => updateField("vitals.weight", v)}
+                />
               </Card>
 
+              {/* Diagnoses */}
               <Card title="Diagnoses" color="#d97706">
-                {result.diagnoses?.map((d, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
-                    <span style={{ ...styles.tag, background: "#fef3c7", color: "#92400e" }}>
-                      {typeof d === "object" ? d.name : d}
-                    </span>
-                    {typeof d === "object" && d.icd10 && (
-                      <span style={{ ...styles.tag, background: "#f0f9ff", color: "#1e40af", fontFamily: "monospace", fontSize: "12px" }}>
-                        {d.icd10}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </Card>
-
-              <Card title="Medications" color="#7c3aed">
-                {result.medications?.map((m, i) => (
-                  <span key={i} style={{ ...styles.tag, background: "#f3e8ff", color: "#6b21a8" }}>{m}</span>
-                ))}
-              </Card>
-
-              {result.cpt_codes?.length > 0 && (
-                <Card title="CPT Codes" color="#dc2626" full>
-                  {result.cpt_codes?.map((c, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-                      <span style={{ ...styles.tag, background: "#fef2f2", color: "#991b1b", fontFamily: "monospace", fontSize: "13px", fontWeight: "700" }}>
-                        {c.code}
-                      </span>
-                      <span style={{ fontSize: "14px", color: "#374151" }}>{c.description}</span>
+                {display.diagnoses?.map((d, i) =>
+                  isEditing ? (
+                    <div key={i} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.6rem", alignItems: "flex-start" }}>
+                      <div style={{ flex: 1 }}>
+                        <input
+                          style={{ ...styles.editInput, marginBottom: "0.3rem" }}
+                          placeholder="Diagnosis name"
+                          value={typeof d === "object" ? d.name : d}
+                          onChange={(e) => updateDiagnosis(i, "name", e.target.value)}
+                        />
+                        <input
+                          style={{ ...styles.editInput, fontFamily: "monospace", fontSize: "12px" }}
+                          placeholder="ICD-10 code"
+                          value={typeof d === "object" ? (d.icd10 ?? "") : ""}
+                          onChange={(e) => updateDiagnosis(i, "icd10", e.target.value)}
+                        />
+                      </div>
+                      <button style={styles.removeBtn} onClick={() => removeDiagnosis(i)} title="Remove">×</button>
                     </div>
-                  ))}
+                  ) : (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
+                      <span style={{ ...styles.tag, background: "#fef3c7", color: "#92400e" }}>
+                        {typeof d === "object" ? d.name : d}
+                      </span>
+                      {typeof d === "object" && d.icd10 && (
+                        <span style={{ ...styles.tag, background: "#f0f9ff", color: "#1e40af", fontFamily: "monospace", fontSize: "12px" }}>
+                          {d.icd10}
+                        </span>
+                      )}
+                    </div>
+                  )
+                )}
+                {isEditing && (
+                  <button style={styles.addBtn} onClick={addDiagnosis}>+ Add diagnosis</button>
+                )}
+              </Card>
+
+              {/* Medications */}
+              <Card title="Medications" color="#7c3aed">
+                {display.medications?.map((m, i) =>
+                  isEditing ? (
+                    <div key={i} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.4rem", alignItems: "center" }}>
+                      <input
+                        style={{ ...styles.editInput, margin: 0 }}
+                        placeholder="Medication"
+                        value={m}
+                        onChange={(e) => updateMedication(i, e.target.value)}
+                      />
+                      <button style={styles.removeBtn} onClick={() => removeMedication(i)} title="Remove">×</button>
+                    </div>
+                  ) : (
+                    <span key={i} style={{ ...styles.tag, background: "#f3e8ff", color: "#6b21a8" }}>{m}</span>
+                  )
+                )}
+                {isEditing && (
+                  <button style={styles.addBtn} onClick={addMedication}>+ Add medication</button>
+                )}
+              </Card>
+
+              {/* CPT Codes */}
+              {(display.cpt_codes?.length > 0 || isEditing) && (
+                <Card title="CPT Codes" color="#dc2626" full>
+                  {display.cpt_codes?.map((c, i) =>
+                    isEditing ? (
+                      <div key={i} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.6rem", alignItems: "center" }}>
+                        <input
+                          style={{ ...styles.editInput, width: "100px", margin: 0, fontFamily: "monospace", fontWeight: "700" }}
+                          placeholder="Code"
+                          value={c.code}
+                          onChange={(e) => updateCpt(i, "code", e.target.value)}
+                        />
+                        <input
+                          style={{ ...styles.editInput, flex: 1, margin: 0 }}
+                          placeholder="Description"
+                          value={c.description}
+                          onChange={(e) => updateCpt(i, "description", e.target.value)}
+                        />
+                        <button style={styles.removeBtn} onClick={() => removeCpt(i)} title="Remove">×</button>
+                      </div>
+                    ) : (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
+                        <span style={{ ...styles.tag, background: "#fef2f2", color: "#991b1b", fontFamily: "monospace", fontSize: "13px", fontWeight: "700" }}>
+                          {c.code}
+                        </span>
+                        <span style={{ fontSize: "14px", color: "#374151" }}>{c.description}</span>
+                      </div>
+                    )
+                  )}
+                  {isEditing && (
+                    <button style={styles.addBtn} onClick={addCpt}>+ Add CPT code</button>
+                  )}
                 </Card>
               )}
 
+              {/* Follow Up */}
               <Card title="Follow Up" color="#0891b2" full>
-                <p style={{ fontSize: "14px", color: "#374151" }}>{result.follow_up}</p>
+                {isEditing ? (
+                  <textarea
+                    style={styles.editTextarea}
+                    rows={3}
+                    value={display.follow_up ?? ""}
+                    onChange={(e) => updateField("follow_up", e.target.value)}
+                  />
+                ) : (
+                  <p style={{ fontSize: "14px", color: "#374151" }}>{display.follow_up}</p>
+                )}
               </Card>
             </div>
           </>
@@ -394,7 +688,7 @@ export default function App() {
             {history.slice(0, 10).map((h) => (
               <div
                 key={h.id}
-                onClick={() => setResult(h.result)}
+                onClick={() => { setResult(h.result); setIsEditing(false); setEditedResult(null); }}
                 style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem 1rem", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
               >
                 <span style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>{h.result?.patient_name ?? "Unknown"}</span>
