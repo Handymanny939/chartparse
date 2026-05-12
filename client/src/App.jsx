@@ -123,6 +123,25 @@ const styles = {
     backgroundSize: "200% 100%",
     animation: "shimmer 1.5s infinite",
   },
+  historySearch: {
+    flex: 1, padding: "0.6rem 0.9rem", fontSize: "14px",
+    border: "1px solid #e2e8f0", borderRadius: "8px", outline: "none",
+    fontFamily: "inherit", background: "white", boxSizing: "border-box",
+    transition: "border 0.2s"
+  },
+  historyFilter: {
+    padding: "0.6rem 0.75rem", fontSize: "13px", border: "1px solid #e2e8f0",
+    borderRadius: "8px", background: "white", color: "#374151",
+    cursor: "pointer", outline: "none", flexShrink: 0
+  },
+  historyEmpty: {
+    textAlign: "center", padding: "1.5rem", fontSize: "14px",
+    color: "#94a3b8", background: "white", borderRadius: "8px",
+    border: "1px solid #e2e8f0"
+  },
+  historyCount: {
+    fontSize: "12px", color: "#94a3b8", marginBottom: "0.5rem"
+  }
 };
 
 function SkeletonCard({ full }) {
@@ -145,7 +164,6 @@ function Card({ title, color, children, full }) {
   );
 }
 
-// Renders a labeled field — static when not editing, input when editing
 function Field({ label, value, editable, onChange }) {
   if (!editable && !value) return null;
   return (
@@ -164,6 +182,25 @@ function Field({ label, value, editable, onChange }) {
   );
 }
 
+function matchesDateFilter(item, filter) {
+  if (filter === "all") return true;
+  if (!item.createdAt) return false;
+  const created = item.createdAt.toDate ? item.createdAt.toDate() : new Date(item.createdAt);
+  const now = new Date();
+  if (filter === "today") return created.toDateString() === now.toDateString();
+  if (filter === "week") {
+    const weekAgo = new Date(now);
+    weekAgo.setDate(now.getDate() - 7);
+    return created >= weekAgo;
+  }
+  if (filter === "month") {
+    const monthAgo = new Date(now);
+    monthAgo.setMonth(now.getMonth() - 1);
+    return created >= monthAgo;
+  }
+  return true;
+}
+
 export default function App() {
   const [note, setNote] = useState("");
   const [result, setResult] = useState(null);
@@ -173,30 +210,36 @@ export default function App() {
   const [user] = useAuthState(auth);
   const [history, setHistory] = useState([]);
 
-  // --- Edit state ---
   const [isEditing, setIsEditing] = useState(false);
   const [editedResult, setEditedResult] = useState(null);
 
-  // The data currently displayed (live edit copy while editing, committed result otherwise)
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyDateFilter, setHistoryDateFilter] = useState("all");
+
   const display = isEditing ? editedResult : result;
+
+  const filteredHistory = history.filter((h) => {
+    const nameMatch = (h.result?.patient_name ?? "")
+      .toLowerCase()
+      .includes(historySearch.toLowerCase());
+    const dateMatch = matchesDateFilter(h, historyDateFilter);
+    return nameMatch && dateMatch;
+  });
 
   const handleEditStart = () => {
     setEditedResult(JSON.parse(JSON.stringify(result)));
     setIsEditing(true);
   };
-
   const handleEditSave = () => {
     setResult(editedResult);
     setIsEditing(false);
     setEditedResult(null);
   };
-
   const handleEditCancel = () => {
     setIsEditing(false);
     setEditedResult(null);
   };
 
-  // Update a simple top-level or nested field: path like "patient_name" or "vitals.blood_pressure"
   const updateField = (path, value) => {
     setEditedResult((prev) => {
       const next = JSON.parse(JSON.stringify(prev));
@@ -208,7 +251,6 @@ export default function App() {
     });
   };
 
-  // --- Diagnosis helpers ---
   const updateDiagnosis = (i, field, value) => {
     setEditedResult((prev) => {
       const next = JSON.parse(JSON.stringify(prev));
@@ -217,73 +259,34 @@ export default function App() {
     });
   };
   const removeDiagnosis = (i) => {
-    setEditedResult((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next.diagnoses.splice(i, 1);
-      return next;
-    });
+    setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.diagnoses.splice(i, 1); return next; });
   };
   const addDiagnosis = () => {
-    setEditedResult((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next.diagnoses = [...(next.diagnoses ?? []), { name: "", icd10: "" }];
-      return next;
-    });
+    setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.diagnoses = [...(next.diagnoses ?? []), { name: "", icd10: "" }]; return next; });
   };
 
-  // --- Medication helpers ---
   const updateMedication = (i, value) => {
-    setEditedResult((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next.medications[i] = value;
-      return next;
-    });
+    setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.medications[i] = value; return next; });
   };
   const removeMedication = (i) => {
-    setEditedResult((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next.medications.splice(i, 1);
-      return next;
-    });
+    setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.medications.splice(i, 1); return next; });
   };
   const addMedication = () => {
-    setEditedResult((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next.medications = [...(next.medications ?? []), ""];
-      return next;
-    });
+    setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.medications = [...(next.medications ?? []), ""]; return next; });
   };
 
-  // --- CPT code helpers ---
   const updateCpt = (i, field, value) => {
-    setEditedResult((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next.cpt_codes[i] = { ...next.cpt_codes[i], [field]: value };
-      return next;
-    });
+    setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.cpt_codes[i] = { ...next.cpt_codes[i], [field]: value }; return next; });
   };
   const removeCpt = (i) => {
-    setEditedResult((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next.cpt_codes.splice(i, 1);
-      return next;
-    });
+    setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.cpt_codes.splice(i, 1); return next; });
   };
   const addCpt = () => {
-    setEditedResult((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next.cpt_codes = [...(next.cpt_codes ?? []), { code: "", description: "" }];
-      return next;
-    });
+    setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.cpt_codes = [...(next.cpt_codes ?? []), { code: "", description: "" }]; return next; });
   };
 
-  // --- Existing handlers ---
   const handleParse = async () => {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    setIsEditing(false);
-    setEditedResult(null);
+    setLoading(true); setError(null); setResult(null); setIsEditing(false); setEditedResult(null);
     try {
       const response = await fetch("https://chartparse-production.up.railway.app/parse", {
         method: "POST",
@@ -294,11 +297,7 @@ export default function App() {
       const parsed = JSON.parse(data.result);
       setResult(parsed);
       if (user) {
-        await addDoc(collection(db, "parses"), {
-          uid: user.uid,
-          result: parsed,
-          createdAt: serverTimestamp(),
-        });
+        await addDoc(collection(db, "parses"), { uid: user.uid, result: parsed, createdAt: serverTimestamp() });
       }
     } catch (err) {
       setError("Could not parse the note. Please try again.");
@@ -310,11 +309,7 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
-    const q = query(
-      collection(db, "parses"),
-      where("uid", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
+    const q = query(collection(db, "parses"), where("uid", "==", user.uid), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
@@ -337,12 +332,9 @@ export default function App() {
       ["Heart Rate", result.vitals?.heart_rate],
       ["Temperature", result.vitals?.temperature],
       ["Weight", result.vitals?.weight],
-      ...result.diagnoses?.map((d) => [
-        "Diagnosis",
-        typeof d === "object" ? `${d.name} (${d.icd10})` : d
-      ]),
+      ...result.diagnoses?.map((d) => ["Diagnosis", typeof d === "object" ? `${d.name} (${d.icd10})` : d]),
       ...result.medications?.map((m) => ["Medication", m]),
-      ...result.cpt_codes?.map((c) => ["CPT Code", `${c.code} — ${c.description}`]) ?? [],
+      ...(result.cpt_codes?.map((c) => ["CPT Code", `${c.code} — ${c.description}`]) ?? []),
       ["Follow Up", result.follow_up],
     ];
     const csv = rows.map((r) => r.map((v) => `"${v ?? ""}"`).join(",")).join("\n");
@@ -358,27 +350,16 @@ export default function App() {
   const handlePDFUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    setIsEditing(false);
-    setEditedResult(null);
+    setLoading(true); setError(null); setResult(null); setIsEditing(false); setEditedResult(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await fetch("https://chartparse-production.up.railway.app/parse-pdf", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch("https://chartparse-production.up.railway.app/parse-pdf", { method: "POST", body: formData });
       const data = await response.json();
       const parsed = JSON.parse(data.result);
       setResult(parsed);
       if (user) {
-        await addDoc(collection(db, "parses"), {
-          uid: user.uid,
-          result: parsed,
-          createdAt: serverTimestamp(),
-        });
+        await addDoc(collection(db, "parses"), { uid: user.uid, result: parsed, createdAt: serverTimestamp() });
       }
     } catch (err) {
       setError("Could not parse the PDF. Please try again.");
@@ -388,29 +369,19 @@ export default function App() {
 
   const handleSampleLoad = (e) => {
     const selected = e.target.value;
-    if (selected) {
-      setNote(SAMPLE_NOTES[selected]);
-      setResult(null);
-      setError(null);
-      setIsEditing(false);
-      setEditedResult(null);
-    }
+    if (selected) { setNote(SAMPLE_NOTES[selected]); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); }
   };
 
   return (
     <div style={styles.app}>
       <header style={styles.header}>
-        <div>
-          <h1 style={styles.logo}>⚕ ChartParse</h1>
-        </div>
+        <div><h1 style={styles.logo}>⚕ ChartParse</h1></div>
         <p style={styles.tagline}>AI-powered clinical note parser for solo practices</p>
         {user && (
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.75rem" }}>
             {user.photoURL && <img src={user.photoURL} alt="avatar" style={{ width: "32px", height: "32px", borderRadius: "50%" }} />}
             <span style={{ fontSize: "14px", color: "#374151" }}>{user.displayName}</span>
-            <button onClick={handleSignOut} style={{ padding: "0.4rem 1rem", background: "white", border: "1px solid #e2e8f0", borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b" }}>
-              Sign out
-            </button>
+            <button onClick={handleSignOut} style={{ padding: "0.4rem 1rem", background: "white", border: "1px solid #e2e8f0", borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b" }}>Sign out</button>
           </div>
         )}
       </header>
@@ -418,48 +389,24 @@ export default function App() {
       <main style={styles.main}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
           <label style={{ ...styles.label, marginBottom: 0 }}>Paste Clinical Note</label>
-          <select
-            onChange={handleSampleLoad}
-            defaultValue=""
-            style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "13px", color: "#374151", background: "white", cursor: "pointer" }}
-          >
+          <select onChange={handleSampleLoad} defaultValue="" style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "13px", color: "#374151", background: "white", cursor: "pointer" }}>
             <option value="" disabled>Load sample note...</option>
-            {Object.keys(SAMPLE_NOTES).map((name) => (
-              <option key={name} value={name}>{name}</option>
-            ))}
+            {Object.keys(SAMPLE_NOTES).map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </div>
 
-        <textarea
-          rows={10}
-          style={styles.textarea}
-          placeholder="Paste a SOAP note or any clinical note here..."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
+        <textarea rows={10} style={styles.textarea} placeholder="Paste a SOAP note or any clinical note here..." value={note} onChange={(e) => setNote(e.target.value)} />
 
         <div style={styles.buttonRow}>
-          <button
-            onClick={handleParse}
-            disabled={loading || !note}
-            style={loading || !note ? styles.parseBtnDisabled : styles.parseBtn}
-          >
+          <button onClick={handleParse} disabled={loading || !note} style={loading || !note ? styles.parseBtnDisabled : styles.parseBtn}>
             {loading ? "⏳ Parsing..." : "Parse Note"}
           </button>
           <label style={{ ...styles.clearBtn, cursor: "pointer", display: "inline-block" }}>
             📄 Upload PDF
-            <input
-              type="file"
-              accept=".pdf"
-              style={{ display: "none" }}
-              onChange={handlePDFUpload}
-              disabled={loading}
-            />
+            <input type="file" accept=".pdf" style={{ display: "none" }} onChange={handlePDFUpload} disabled={loading} />
           </label>
           {note && (
-            <button onClick={() => { setNote(""); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); }} style={styles.clearBtn}>
-              Clear
-            </button>
+            <button onClick={() => { setNote(""); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); }} style={styles.clearBtn}>Clear</button>
           )}
         </div>
 
@@ -471,11 +418,7 @@ export default function App() {
               <div style={{ ...styles.skeletonLine, height: "18px", width: "150px" }} />
             </div>
             <div style={styles.grid}>
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard full />
+              <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard full />
             </div>
           </>
         )}
@@ -487,191 +430,96 @@ export default function App() {
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 {!isEditing ? (
                   <>
-                    <button onClick={handleEditStart} style={styles.editBtn}>
-                      ✏ Edit Results
-                    </button>
-                    <button onClick={handleCopy} style={styles.copyBtn}>
-                      {copied ? "✓ Copied!" : "Copy JSON"}
-                    </button>
-                    <button onClick={handleDownloadCSV} style={{ ...styles.copyBtn, background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>
-                      ↓ Download CSV
-                    </button>
+                    <button onClick={handleEditStart} style={styles.editBtn}>✏ Edit Results</button>
+                    <button onClick={handleCopy} style={styles.copyBtn}>{copied ? "✓ Copied!" : "Copy JSON"}</button>
+                    <button onClick={handleDownloadCSV} style={{ ...styles.copyBtn, background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>↓ Download CSV</button>
                   </>
                 ) : (
                   <>
-                    <button onClick={handleEditSave} style={styles.saveBtn}>
-                      ✓ Save Changes
-                    </button>
-                    <button onClick={handleEditCancel} style={styles.cancelBtn}>
-                      Cancel
-                    </button>
+                    <button onClick={handleEditSave} style={styles.saveBtn}>✓ Save Changes</button>
+                    <button onClick={handleEditCancel} style={styles.cancelBtn}>Cancel</button>
                   </>
                 )}
               </div>
             </div>
 
             {isEditing && (
-              <div style={styles.editingBanner}>
-                ✏ Editing mode — correct any AI mistakes, then click Save Changes.
-              </div>
+              <div style={styles.editingBanner}>✏ Editing mode — correct any AI mistakes, then click Save Changes.</div>
             )}
 
             <div style={styles.grid}>
-              {/* Patient Info */}
               <Card title="Patient Info" color="#2563eb">
-                <Field
-                  label="Name"
-                  value={display.patient_name}
-                  editable={isEditing}
-                  onChange={(v) => updateField("patient_name", v)}
-                />
-                <Field
-                  label="Date of Visit"
-                  value={display.date_of_visit}
-                  editable={isEditing}
-                  onChange={(v) => updateField("date_of_visit", v)}
-                />
-                <Field
-                  label="Chief Complaint"
-                  value={display.chief_complaint}
-                  editable={isEditing}
-                  onChange={(v) => updateField("chief_complaint", v)}
-                />
+                <Field label="Name" value={display.patient_name} editable={isEditing} onChange={(v) => updateField("patient_name", v)} />
+                <Field label="Date of Visit" value={display.date_of_visit} editable={isEditing} onChange={(v) => updateField("date_of_visit", v)} />
+                <Field label="Chief Complaint" value={display.chief_complaint} editable={isEditing} onChange={(v) => updateField("chief_complaint", v)} />
               </Card>
 
-              {/* Vitals */}
               <Card title="Vitals" color="#16a34a">
-                <Field
-                  label="Blood Pressure"
-                  value={display.vitals?.blood_pressure}
-                  editable={isEditing}
-                  onChange={(v) => updateField("vitals.blood_pressure", v)}
-                />
-                <Field
-                  label="Heart Rate"
-                  value={display.vitals?.heart_rate}
-                  editable={isEditing}
-                  onChange={(v) => updateField("vitals.heart_rate", v)}
-                />
-                <Field
-                  label="Temperature"
-                  value={display.vitals?.temperature}
-                  editable={isEditing}
-                  onChange={(v) => updateField("vitals.temperature", v)}
-                />
-                <Field
-                  label="Weight"
-                  value={display.vitals?.weight}
-                  editable={isEditing}
-                  onChange={(v) => updateField("vitals.weight", v)}
-                />
+                <Field label="Blood Pressure" value={display.vitals?.blood_pressure} editable={isEditing} onChange={(v) => updateField("vitals.blood_pressure", v)} />
+                <Field label="Heart Rate" value={display.vitals?.heart_rate} editable={isEditing} onChange={(v) => updateField("vitals.heart_rate", v)} />
+                <Field label="Temperature" value={display.vitals?.temperature} editable={isEditing} onChange={(v) => updateField("vitals.temperature", v)} />
+                <Field label="Weight" value={display.vitals?.weight} editable={isEditing} onChange={(v) => updateField("vitals.weight", v)} />
               </Card>
 
-              {/* Diagnoses */}
               <Card title="Diagnoses" color="#d97706">
                 {display.diagnoses?.map((d, i) =>
                   isEditing ? (
                     <div key={i} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.6rem", alignItems: "flex-start" }}>
                       <div style={{ flex: 1 }}>
-                        <input
-                          style={{ ...styles.editInput, marginBottom: "0.3rem" }}
-                          placeholder="Diagnosis name"
-                          value={typeof d === "object" ? d.name : d}
-                          onChange={(e) => updateDiagnosis(i, "name", e.target.value)}
-                        />
-                        <input
-                          style={{ ...styles.editInput, fontFamily: "monospace", fontSize: "12px" }}
-                          placeholder="ICD-10 code"
-                          value={typeof d === "object" ? (d.icd10 ?? "") : ""}
-                          onChange={(e) => updateDiagnosis(i, "icd10", e.target.value)}
-                        />
+                        <input style={{ ...styles.editInput, marginBottom: "0.3rem" }} placeholder="Diagnosis name" value={typeof d === "object" ? d.name : d} onChange={(e) => updateDiagnosis(i, "name", e.target.value)} />
+                        <input style={{ ...styles.editInput, fontFamily: "monospace", fontSize: "12px" }} placeholder="ICD-10 code" value={typeof d === "object" ? (d.icd10 ?? "") : ""} onChange={(e) => updateDiagnosis(i, "icd10", e.target.value)} />
                       </div>
-                      <button style={styles.removeBtn} onClick={() => removeDiagnosis(i)} title="Remove">×</button>
+                      <button style={styles.removeBtn} onClick={() => removeDiagnosis(i)}>×</button>
                     </div>
                   ) : (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
-                      <span style={{ ...styles.tag, background: "#fef3c7", color: "#92400e" }}>
-                        {typeof d === "object" ? d.name : d}
-                      </span>
+                      <span style={{ ...styles.tag, background: "#fef3c7", color: "#92400e" }}>{typeof d === "object" ? d.name : d}</span>
                       {typeof d === "object" && d.icd10 && (
-                        <span style={{ ...styles.tag, background: "#f0f9ff", color: "#1e40af", fontFamily: "monospace", fontSize: "12px" }}>
-                          {d.icd10}
-                        </span>
+                        <span style={{ ...styles.tag, background: "#f0f9ff", color: "#1e40af", fontFamily: "monospace", fontSize: "12px" }}>{d.icd10}</span>
                       )}
                     </div>
                   )
                 )}
-                {isEditing && (
-                  <button style={styles.addBtn} onClick={addDiagnosis}>+ Add diagnosis</button>
-                )}
+                {isEditing && <button style={styles.addBtn} onClick={addDiagnosis}>+ Add diagnosis</button>}
               </Card>
 
-              {/* Medications */}
               <Card title="Medications" color="#7c3aed">
                 {display.medications?.map((m, i) =>
                   isEditing ? (
                     <div key={i} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.4rem", alignItems: "center" }}>
-                      <input
-                        style={{ ...styles.editInput, margin: 0 }}
-                        placeholder="Medication"
-                        value={m}
-                        onChange={(e) => updateMedication(i, e.target.value)}
-                      />
-                      <button style={styles.removeBtn} onClick={() => removeMedication(i)} title="Remove">×</button>
+                      <input style={{ ...styles.editInput, margin: 0 }} placeholder="Medication" value={m} onChange={(e) => updateMedication(i, e.target.value)} />
+                      <button style={styles.removeBtn} onClick={() => removeMedication(i)}>×</button>
                     </div>
                   ) : (
                     <span key={i} style={{ ...styles.tag, background: "#f3e8ff", color: "#6b21a8" }}>{m}</span>
                   )
                 )}
-                {isEditing && (
-                  <button style={styles.addBtn} onClick={addMedication}>+ Add medication</button>
-                )}
+                {isEditing && <button style={styles.addBtn} onClick={addMedication}>+ Add medication</button>}
               </Card>
 
-              {/* CPT Codes */}
               {(display.cpt_codes?.length > 0 || isEditing) && (
                 <Card title="CPT Codes" color="#dc2626" full>
                   {display.cpt_codes?.map((c, i) =>
                     isEditing ? (
                       <div key={i} style={{ display: "flex", gap: "0.5rem", marginBottom: "0.6rem", alignItems: "center" }}>
-                        <input
-                          style={{ ...styles.editInput, width: "100px", margin: 0, fontFamily: "monospace", fontWeight: "700" }}
-                          placeholder="Code"
-                          value={c.code}
-                          onChange={(e) => updateCpt(i, "code", e.target.value)}
-                        />
-                        <input
-                          style={{ ...styles.editInput, flex: 1, margin: 0 }}
-                          placeholder="Description"
-                          value={c.description}
-                          onChange={(e) => updateCpt(i, "description", e.target.value)}
-                        />
-                        <button style={styles.removeBtn} onClick={() => removeCpt(i)} title="Remove">×</button>
+                        <input style={{ ...styles.editInput, width: "100px", margin: 0, fontFamily: "monospace", fontWeight: "700" }} placeholder="Code" value={c.code} onChange={(e) => updateCpt(i, "code", e.target.value)} />
+                        <input style={{ ...styles.editInput, flex: 1, margin: 0 }} placeholder="Description" value={c.description} onChange={(e) => updateCpt(i, "description", e.target.value)} />
+                        <button style={styles.removeBtn} onClick={() => removeCpt(i)}>×</button>
                       </div>
                     ) : (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
-                        <span style={{ ...styles.tag, background: "#fef2f2", color: "#991b1b", fontFamily: "monospace", fontSize: "13px", fontWeight: "700" }}>
-                          {c.code}
-                        </span>
+                        <span style={{ ...styles.tag, background: "#fef2f2", color: "#991b1b", fontFamily: "monospace", fontSize: "13px", fontWeight: "700" }}>{c.code}</span>
                         <span style={{ fontSize: "14px", color: "#374151" }}>{c.description}</span>
                       </div>
                     )
                   )}
-                  {isEditing && (
-                    <button style={styles.addBtn} onClick={addCpt}>+ Add CPT code</button>
-                  )}
+                  {isEditing && <button style={styles.addBtn} onClick={addCpt}>+ Add CPT code</button>}
                 </Card>
               )}
 
-              {/* Follow Up */}
               <Card title="Follow Up" color="#0891b2" full>
                 {isEditing ? (
-                  <textarea
-                    style={styles.editTextarea}
-                    rows={3}
-                    value={display.follow_up ?? ""}
-                    onChange={(e) => updateField("follow_up", e.target.value)}
-                  />
+                  <textarea style={styles.editTextarea} rows={3} value={display.follow_up ?? ""} onChange={(e) => updateField("follow_up", e.target.value)} />
                 ) : (
                   <p style={{ fontSize: "14px", color: "#374151" }}>{display.follow_up}</p>
                 )}
@@ -684,17 +532,53 @@ export default function App() {
       {history.length > 0 && (
         <aside style={{ maxWidth: "860px", margin: "0 auto", padding: "0 1.5rem 3rem" }}>
           <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1e293b", marginBottom: "0.75rem" }}>Recent Parses</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {history.slice(0, 10).map((h) => (
-              <div
-                key={h.id}
-                onClick={() => { setResult(h.result); setIsEditing(false); setEditedResult(null); }}
-                style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem 1rem", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+
+          {/* Search + filter bar */}
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.6rem" }}>
+            <input
+              type="text"
+              placeholder="Search by patient name..."
+              value={historySearch}
+              onChange={(e) => setHistorySearch(e.target.value)}
+              style={styles.historySearch}
+            />
+            <select value={historyDateFilter} onChange={(e) => setHistoryDateFilter(e.target.value)} style={styles.historyFilter}>
+              <option value="all">All time</option>
+              <option value="today">Today</option>
+              <option value="week">This week</option>
+              <option value="month">This month</option>
+            </select>
+            {(historySearch || historyDateFilter !== "all") && (
+              <button
+                onClick={() => { setHistorySearch(""); setHistoryDateFilter("all"); }}
+                style={{ ...styles.historyFilter, color: "#ef4444", borderColor: "#fecaca", background: "#fef2f2" }}
               >
-                <span style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>{h.result?.patient_name ?? "Unknown"}</span>
-                <span style={{ fontSize: "12px", color: "#94a3b8" }}>{h.result?.date_of_visit ?? ""}</span>
-              </div>
-            ))}
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Result count */}
+          <div style={styles.historyCount}>
+            {filteredHistory.length} of {history.length} {history.length === 1 ? "parse" : "parses"}
+          </div>
+
+          {/* History list */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {filteredHistory.length === 0 ? (
+              <div style={styles.historyEmpty}>No parses match your search.</div>
+            ) : (
+              filteredHistory.slice(0, 20).map((h) => (
+                <div
+                  key={h.id}
+                  onClick={() => { setResult(h.result); setIsEditing(false); setEditedResult(null); }}
+                  style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem 1rem", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                >
+                  <span style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>{h.result?.patient_name ?? "Unknown"}</span>
+                  <span style={{ fontSize: "12px", color: "#94a3b8" }}>{h.result?.date_of_visit ?? ""}</span>
+                </div>
+              ))
+            )}
           </div>
         </aside>
       )}
