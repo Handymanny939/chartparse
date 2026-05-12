@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { auth, db } from "./firebase";
 import { signOut } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
-import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, query, where, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
 
 const SAMPLE_NOTES = {
   "Acute Bronchitis": `Patient: John Smith, DOB: 03/15/1970. Visit Date: 05/01/2026. Chief Complaint: Persistent cough and shortness of breath for 5 days. Vitals: BP 138/88, HR 92, Temp 99.8F, Weight 185lbs. Assessment: 1. Acute bronchitis 2. Mild hypertension. Plan: Prescribed Azithromycin 500mg for 5 days, Albuterol inhaler as needed. Follow up in 2 weeks if symptoms persist.`,
@@ -15,14 +15,9 @@ const SAMPLE_NOTES = {
 const styles = {
   app: { minHeight: "100vh", background: "#f8fafc" },
   header: {
-    background: "white",
-    borderBottom: "1px solid #e2e8f0",
-    padding: "0.75rem 1rem",
-    display: "flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-    flexWrap: "wrap"
+    background: "white", borderBottom: "1px solid #e2e8f0", padding: "0.75rem 1rem",
+    display: "flex", alignItems: "center", gap: "0.5rem",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.06)", flexWrap: "wrap"
   },
   logo: { fontSize: "22px", fontWeight: "700", color: "#2563eb", margin: 0 },
   tagline: { fontSize: "13px", color: "#94a3b8", margin: 0 },
@@ -47,37 +42,29 @@ const styles = {
   },
   clearBtn: {
     padding: "0.7rem 1.25rem", background: "white", color: "#64748b",
-    border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "15px",
-    cursor: "pointer"
+    border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "15px", cursor: "pointer"
   },
   error: {
     marginTop: "1rem", padding: "0.85rem 1rem", background: "#fef2f2",
     border: "1px solid #fecaca", borderRadius: "8px", color: "#dc2626", fontSize: "14px"
   },
-  resultsHeader: {
-    display: "flex", justifyContent: "space-between",
-    alignItems: "center", margin: "2rem 0 1rem"
-  },
+  resultsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", margin: "2rem 0 1rem" },
   resultsTitle: { fontSize: "18px", fontWeight: "700", color: "#1e293b", margin: 0 },
   copyBtn: {
     padding: "0.5rem 1rem", background: "white", border: "1px solid #e2e8f0",
-    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b",
-    fontWeight: "500"
+    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b", fontWeight: "500"
   },
   editBtn: {
     padding: "0.5rem 1rem", background: "#eff6ff", border: "1px solid #bfdbfe",
-    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#2563eb",
-    fontWeight: "600"
+    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#2563eb", fontWeight: "600"
   },
   saveBtn: {
     padding: "0.5rem 1rem", background: "#2563eb", border: "none",
-    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "white",
-    fontWeight: "600"
+    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "white", fontWeight: "600"
   },
   cancelBtn: {
     padding: "0.5rem 1rem", background: "white", border: "1px solid #e2e8f0",
-    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b",
-    fontWeight: "500"
+    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b", fontWeight: "500"
   },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" },
   card: { background: "white", borderRadius: "12px", padding: "1.25rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #f1f5f9" },
@@ -85,15 +72,11 @@ const styles = {
   cardTitle: { fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.85rem" },
   field: { marginBottom: "0.5rem", fontSize: "14px", color: "#374151" },
   fieldLabel: { fontWeight: "600", color: "#64748b", fontSize: "13px" },
-  tag: {
-    display: "inline-block", padding: "0.25rem 0.65rem",
-    borderRadius: "99px", fontSize: "13px", fontWeight: "500", margin: "0.2rem"
-  },
+  tag: { display: "inline-block", padding: "0.25rem 0.65rem", borderRadius: "99px", fontSize: "13px", fontWeight: "500", margin: "0.2rem" },
   editInput: {
     fontSize: "14px", border: "1px solid #e2e8f0", borderRadius: "6px",
     padding: "0.25rem 0.5rem", fontFamily: "inherit", background: "#f8fafc",
-    outline: "none", transition: "border 0.2s", width: "100%", marginTop: "0.2rem",
-    boxSizing: "border-box"
+    outline: "none", transition: "border 0.2s", width: "100%", marginTop: "0.2rem", boxSizing: "border-box"
   },
   editTextarea: {
     fontSize: "14px", border: "1px solid #e2e8f0", borderRadius: "6px",
@@ -103,18 +86,21 @@ const styles = {
   },
   removeBtn: {
     background: "none", border: "none", cursor: "pointer",
-    color: "#ef4444", fontSize: "16px", padding: "0 0.25rem", lineHeight: 1,
-    flexShrink: 0
+    color: "#ef4444", fontSize: "16px", padding: "0 0.25rem", lineHeight: 1, flexShrink: 0
   },
   addBtn: {
     marginTop: "0.5rem", padding: "0.3rem 0.75rem", background: "white",
     border: "1px dashed #cbd5e1", borderRadius: "6px", fontSize: "13px",
-    cursor: "pointer", color: "#64748b", display: "block", width: "100%",
-    textAlign: "left"
+    cursor: "pointer", color: "#64748b", display: "block", width: "100%", textAlign: "left"
   },
   editingBanner: {
     background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px",
     padding: "0.6rem 1rem", fontSize: "13px", color: "#1d4ed8",
+    marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem"
+  },
+  savedBanner: {
+    background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px",
+    padding: "0.6rem 1rem", fontSize: "13px", color: "#15803d",
     marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem"
   },
   skeletonLine: {
@@ -126,22 +112,17 @@ const styles = {
   historySearch: {
     flex: 1, padding: "0.6rem 0.9rem", fontSize: "14px",
     border: "1px solid #e2e8f0", borderRadius: "8px", outline: "none",
-    fontFamily: "inherit", background: "white", boxSizing: "border-box",
-    transition: "border 0.2s"
+    fontFamily: "inherit", background: "white", boxSizing: "border-box", transition: "border 0.2s"
   },
   historyFilter: {
     padding: "0.6rem 0.75rem", fontSize: "13px", border: "1px solid #e2e8f0",
-    borderRadius: "8px", background: "white", color: "#374151",
-    cursor: "pointer", outline: "none", flexShrink: 0
+    borderRadius: "8px", background: "white", color: "#374151", cursor: "pointer", outline: "none", flexShrink: 0
   },
   historyEmpty: {
     textAlign: "center", padding: "1.5rem", fontSize: "14px",
-    color: "#94a3b8", background: "white", borderRadius: "8px",
-    border: "1px solid #e2e8f0"
+    color: "#94a3b8", background: "white", borderRadius: "8px", border: "1px solid #e2e8f0"
   },
-  historyCount: {
-    fontSize: "12px", color: "#94a3b8", marginBottom: "0.5rem"
-  }
+  historyCount: { fontSize: "12px", color: "#94a3b8", marginBottom: "0.5rem" }
 };
 
 function SkeletonCard({ full }) {
@@ -170,11 +151,7 @@ function Field({ label, value, editable, onChange }) {
     <div style={styles.field}>
       <span style={styles.fieldLabel}>{label}</span>
       {editable ? (
-        <input
-          style={styles.editInput}
-          value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <input style={styles.editInput} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />
       ) : (
         <span style={{ marginLeft: "0.25rem" }}>{value}</span>
       )}
@@ -188,16 +165,8 @@ function matchesDateFilter(item, filter) {
   const created = item.createdAt.toDate ? item.createdAt.toDate() : new Date(item.createdAt);
   const now = new Date();
   if (filter === "today") return created.toDateString() === now.toDateString();
-  if (filter === "week") {
-    const weekAgo = new Date(now);
-    weekAgo.setDate(now.getDate() - 7);
-    return created >= weekAgo;
-  }
-  if (filter === "month") {
-    const monthAgo = new Date(now);
-    monthAgo.setMonth(now.getMonth() - 1);
-    return created >= monthAgo;
-  }
+  if (filter === "week") { const d = new Date(now); d.setDate(now.getDate() - 7); return created >= d; }
+  if (filter === "month") { const d = new Date(now); d.setMonth(now.getMonth() - 1); return created >= d; }
   return true;
 }
 
@@ -212,6 +181,11 @@ export default function App() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedResult, setEditedResult] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editSaved, setEditSaved] = useState(false);
+
+  // Tracks which Firestore doc the current result belongs to
+  const [currentDocId, setCurrentDocId] = useState(null);
 
   const [historySearch, setHistorySearch] = useState("");
   const [historyDateFilter, setHistoryDateFilter] = useState("all");
@@ -219,22 +193,34 @@ export default function App() {
   const display = isEditing ? editedResult : result;
 
   const filteredHistory = history.filter((h) => {
-    const nameMatch = (h.result?.patient_name ?? "")
-      .toLowerCase()
-      .includes(historySearch.toLowerCase());
-    const dateMatch = matchesDateFilter(h, historyDateFilter);
-    return nameMatch && dateMatch;
+    const nameMatch = (h.result?.patient_name ?? "").toLowerCase().includes(historySearch.toLowerCase());
+    return nameMatch && matchesDateFilter(h, historyDateFilter);
   });
 
   const handleEditStart = () => {
     setEditedResult(JSON.parse(JSON.stringify(result)));
+    setEditSaved(false);
     setIsEditing(true);
   };
-  const handleEditSave = () => {
+
+  // Saves edits locally and persists to Firestore if we have a doc ID
+  const handleEditSave = async () => {
+    setSavingEdit(true);
     setResult(editedResult);
+    if (user && currentDocId) {
+      try {
+        await updateDoc(doc(db, "parses", currentDocId), { result: editedResult });
+      } catch (err) {
+        console.error("Failed to save edits to Firestore:", err);
+      }
+    }
+    setSavingEdit(false);
     setIsEditing(false);
     setEditedResult(null);
+    setEditSaved(true);
+    setTimeout(() => setEditSaved(false), 3000);
   };
+
   const handleEditCancel = () => {
     setIsEditing(false);
     setEditedResult(null);
@@ -252,11 +238,7 @@ export default function App() {
   };
 
   const updateDiagnosis = (i, field, value) => {
-    setEditedResult((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
-      next.diagnoses[i] = { ...next.diagnoses[i], [field]: value };
-      return next;
-    });
+    setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.diagnoses[i] = { ...next.diagnoses[i], [field]: value }; return next; });
   };
   const removeDiagnosis = (i) => {
     setEditedResult((prev) => { const next = JSON.parse(JSON.stringify(prev)); next.diagnoses.splice(i, 1); return next; });
@@ -286,7 +268,8 @@ export default function App() {
   };
 
   const handleParse = async () => {
-    setLoading(true); setError(null); setResult(null); setIsEditing(false); setEditedResult(null);
+    setLoading(true); setError(null); setResult(null);
+    setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setEditSaved(false);
     try {
       const response = await fetch("https://chartparse-production.up.railway.app/parse", {
         method: "POST",
@@ -297,7 +280,11 @@ export default function App() {
       const parsed = JSON.parse(data.result);
       setResult(parsed);
       if (user) {
-        await addDoc(collection(db, "parses"), { uid: user.uid, result: parsed, createdAt: serverTimestamp() });
+        // Capture the doc ref so edits can be persisted later
+        const docRef = await addDoc(collection(db, "parses"), {
+          uid: user.uid, result: parsed, createdAt: serverTimestamp(),
+        });
+        setCurrentDocId(docRef.id);
       }
     } catch (err) {
       setError("Could not parse the note. Please try again.");
@@ -350,7 +337,8 @@ export default function App() {
   const handlePDFUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setLoading(true); setError(null); setResult(null); setIsEditing(false); setEditedResult(null);
+    setLoading(true); setError(null); setResult(null);
+    setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setEditSaved(false);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -359,7 +347,10 @@ export default function App() {
       const parsed = JSON.parse(data.result);
       setResult(parsed);
       if (user) {
-        await addDoc(collection(db, "parses"), { uid: user.uid, result: parsed, createdAt: serverTimestamp() });
+        const docRef = await addDoc(collection(db, "parses"), {
+          uid: user.uid, result: parsed, createdAt: serverTimestamp(),
+        });
+        setCurrentDocId(docRef.id);
       }
     } catch (err) {
       setError("Could not parse the PDF. Please try again.");
@@ -369,7 +360,10 @@ export default function App() {
 
   const handleSampleLoad = (e) => {
     const selected = e.target.value;
-    if (selected) { setNote(SAMPLE_NOTES[selected]); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); }
+    if (selected) {
+      setNote(SAMPLE_NOTES[selected]); setResult(null); setError(null);
+      setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setEditSaved(false);
+    }
   };
 
   return (
@@ -406,7 +400,7 @@ export default function App() {
             <input type="file" accept=".pdf" style={{ display: "none" }} onChange={handlePDFUpload} disabled={loading} />
           </label>
           {note && (
-            <button onClick={() => { setNote(""); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); }} style={styles.clearBtn}>Clear</button>
+            <button onClick={() => { setNote(""); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setEditSaved(false); }} style={styles.clearBtn}>Clear</button>
           )}
         </div>
 
@@ -436,7 +430,9 @@ export default function App() {
                   </>
                 ) : (
                   <>
-                    <button onClick={handleEditSave} style={styles.saveBtn}>✓ Save Changes</button>
+                    <button onClick={handleEditSave} disabled={savingEdit} style={{ ...styles.saveBtn, opacity: savingEdit ? 0.7 : 1 }}>
+                      {savingEdit ? "Saving..." : "✓ Save Changes"}
+                    </button>
                     <button onClick={handleEditCancel} style={styles.cancelBtn}>Cancel</button>
                   </>
                 )}
@@ -445,6 +441,9 @@ export default function App() {
 
             {isEditing && (
               <div style={styles.editingBanner}>✏ Editing mode — correct any AI mistakes, then click Save Changes.</div>
+            )}
+            {editSaved && !isEditing && (
+              <div style={styles.savedBanner}>✓ Edits saved successfully.</div>
             )}
 
             <div style={styles.grid}>
@@ -532,16 +531,8 @@ export default function App() {
       {history.length > 0 && (
         <aside style={{ maxWidth: "860px", margin: "0 auto", padding: "0 1.5rem 3rem" }}>
           <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1e293b", marginBottom: "0.75rem" }}>Recent Parses</h2>
-
-          {/* Search + filter bar */}
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.6rem" }}>
-            <input
-              type="text"
-              placeholder="Search by patient name..."
-              value={historySearch}
-              onChange={(e) => setHistorySearch(e.target.value)}
-              style={styles.historySearch}
-            />
+            <input type="text" placeholder="Search by patient name..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} style={styles.historySearch} />
             <select value={historyDateFilter} onChange={(e) => setHistoryDateFilter(e.target.value)} style={styles.historyFilter}>
               <option value="all">All time</option>
               <option value="today">Today</option>
@@ -549,21 +540,10 @@ export default function App() {
               <option value="month">This month</option>
             </select>
             {(historySearch || historyDateFilter !== "all") && (
-              <button
-                onClick={() => { setHistorySearch(""); setHistoryDateFilter("all"); }}
-                style={{ ...styles.historyFilter, color: "#ef4444", borderColor: "#fecaca", background: "#fef2f2" }}
-              >
-                Clear
-              </button>
+              <button onClick={() => { setHistorySearch(""); setHistoryDateFilter("all"); }} style={{ ...styles.historyFilter, color: "#ef4444", borderColor: "#fecaca", background: "#fef2f2" }}>Clear</button>
             )}
           </div>
-
-          {/* Result count */}
-          <div style={styles.historyCount}>
-            {filteredHistory.length} of {history.length} {history.length === 1 ? "parse" : "parses"}
-          </div>
-
-          {/* History list */}
+          <div style={styles.historyCount}>{filteredHistory.length} of {history.length} {history.length === 1 ? "parse" : "parses"}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             {filteredHistory.length === 0 ? (
               <div style={styles.historyEmpty}>No parses match your search.</div>
@@ -571,7 +551,13 @@ export default function App() {
               filteredHistory.slice(0, 20).map((h) => (
                 <div
                   key={h.id}
-                  onClick={() => { setResult(h.result); setIsEditing(false); setEditedResult(null); }}
+                  onClick={() => {
+                    setResult(h.result);
+                    setCurrentDocId(h.id); // ← track which doc this is
+                    setIsEditing(false);
+                    setEditedResult(null);
+                    setEditSaved(false);
+                  }}
                   style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem 1rem", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                 >
                   <span style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>{h.result?.patient_name ?? "Unknown"}</span>
