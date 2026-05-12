@@ -12,6 +12,31 @@ const SAMPLE_NOTES = {
   "Back Pain": `Patient: Michael Torres, DOB: 09/30/1982. Visit Date: 05/01/2026. Chief Complaint: Lower back pain radiating to left leg after lifting at work 4 days ago. Vitals: BP 124/80, HR 74, Temp 98.4F, Weight 195lbs. Assessment: 1. Lumbar radiculopathy 2. Muscle strain. Plan: Prescribed Cyclobenzaprine 5mg at bedtime, Naproxen 500mg twice daily. Physical therapy referral placed. Follow up in 2 weeks.`
 };
 
+const TAGS = [
+  { label: "Pending",  bg: "#fef3c7", color: "#92400e", border: "#fcd34d" },
+  { label: "Reviewed", bg: "#dbeafe", color: "#1e40af", border: "#93c5fd" },
+  { label: "Billed",   bg: "#dcfce7", color: "#15803d", border: "#86efac" },
+];
+
+function TagBadge({ tag, size = "sm" }) {
+  const t = TAGS.find((t) => t.label === tag);
+  if (!t) return null;
+  return (
+    <span style={{
+      display: "inline-block",
+      padding: size === "sm" ? "0.15rem 0.5rem" : "0.25rem 0.65rem",
+      borderRadius: "99px",
+      fontSize: size === "sm" ? "11px" : "13px",
+      fontWeight: "600",
+      background: t.bg,
+      color: t.color,
+      border: `1px solid ${t.border}`,
+    }}>
+      {t.label}
+    </span>
+  );
+}
+
 const styles = {
   app: { minHeight: "100vh", background: "#f8fafc" },
   header: {
@@ -48,7 +73,7 @@ const styles = {
     marginTop: "1rem", padding: "0.85rem 1rem", background: "#fef2f2",
     border: "1px solid #fecaca", borderRadius: "8px", color: "#dc2626", fontSize: "14px"
   },
-  resultsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", margin: "2rem 0 1rem" },
+  resultsHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", margin: "2rem 0 0.5rem" },
   resultsTitle: { fontSize: "18px", fontWeight: "700", color: "#1e293b", margin: 0 },
   copyBtn: {
     padding: "0.5rem 1rem", background: "white", border: "1px solid #e2e8f0",
@@ -122,7 +147,7 @@ const styles = {
     textAlign: "center", padding: "1.5rem", fontSize: "14px",
     color: "#94a3b8", background: "white", borderRadius: "8px", border: "1px solid #e2e8f0"
   },
-  historyCount: { fontSize: "12px", color: "#94a3b8", marginBottom: "0.5rem" }
+  historyCount: { fontSize: "12px", color: "#94a3b8", marginBottom: "0.5rem" },
 };
 
 function SkeletonCard({ full }) {
@@ -184,8 +209,10 @@ export default function App() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [editSaved, setEditSaved] = useState(false);
 
-  // Tracks which Firestore doc the current result belongs to
   const [currentDocId, setCurrentDocId] = useState(null);
+
+  // Current tag for the displayed result
+  const [currentTag, setCurrentTag] = useState(null);
 
   const [historySearch, setHistorySearch] = useState("");
   const [historyDateFilter, setHistoryDateFilter] = useState("all");
@@ -197,13 +224,25 @@ export default function App() {
     return nameMatch && matchesDateFilter(h, historyDateFilter);
   });
 
+  // Tag change — persists immediately to Firestore
+  const handleTagChange = async (label) => {
+    const newTag = currentTag === label ? null : label; // clicking active tag clears it
+    setCurrentTag(newTag);
+    if (user && currentDocId) {
+      try {
+        await updateDoc(doc(db, "parses", currentDocId), { tag: newTag ?? "" });
+      } catch (err) {
+        console.error("Failed to save tag:", err);
+      }
+    }
+  };
+
   const handleEditStart = () => {
     setEditedResult(JSON.parse(JSON.stringify(result)));
     setEditSaved(false);
     setIsEditing(true);
   };
 
-  // Saves edits locally and persists to Firestore if we have a doc ID
   const handleEditSave = async () => {
     setSavingEdit(true);
     setResult(editedResult);
@@ -211,7 +250,7 @@ export default function App() {
       try {
         await updateDoc(doc(db, "parses", currentDocId), { result: editedResult });
       } catch (err) {
-        console.error("Failed to save edits to Firestore:", err);
+        console.error("Failed to save edits:", err);
       }
     }
     setSavingEdit(false);
@@ -221,10 +260,7 @@ export default function App() {
     setTimeout(() => setEditSaved(false), 3000);
   };
 
-  const handleEditCancel = () => {
-    setIsEditing(false);
-    setEditedResult(null);
-  };
+  const handleEditCancel = () => { setIsEditing(false); setEditedResult(null); };
 
   const updateField = (path, value) => {
     setEditedResult((prev) => {
@@ -269,20 +305,19 @@ export default function App() {
 
   const handleParse = async () => {
     setLoading(true); setError(null); setResult(null);
-    setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setEditSaved(false);
+    setIsEditing(false); setEditedResult(null); setCurrentDocId(null);
+    setCurrentTag(null); setEditSaved(false);
     try {
       const response = await fetch("https://chartparse-production.up.railway.app/parse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ note }),
       });
       const data = await response.json();
       const parsed = JSON.parse(data.result);
       setResult(parsed);
       if (user) {
-        // Capture the doc ref so edits can be persisted later
         const docRef = await addDoc(collection(db, "parses"), {
-          uid: user.uid, result: parsed, createdAt: serverTimestamp(),
+          uid: user.uid, result: parsed, tag: "", createdAt: serverTimestamp(),
         });
         setCurrentDocId(docRef.id);
       }
@@ -338,7 +373,8 @@ export default function App() {
     const file = e.target.files[0];
     if (!file) return;
     setLoading(true); setError(null); setResult(null);
-    setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setEditSaved(false);
+    setIsEditing(false); setEditedResult(null); setCurrentDocId(null);
+    setCurrentTag(null); setEditSaved(false);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -348,7 +384,7 @@ export default function App() {
       setResult(parsed);
       if (user) {
         const docRef = await addDoc(collection(db, "parses"), {
-          uid: user.uid, result: parsed, createdAt: serverTimestamp(),
+          uid: user.uid, result: parsed, tag: "", createdAt: serverTimestamp(),
         });
         setCurrentDocId(docRef.id);
       }
@@ -362,7 +398,8 @@ export default function App() {
     const selected = e.target.value;
     if (selected) {
       setNote(SAMPLE_NOTES[selected]); setResult(null); setError(null);
-      setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setEditSaved(false);
+      setIsEditing(false); setEditedResult(null); setCurrentDocId(null);
+      setCurrentTag(null); setEditSaved(false);
     }
   };
 
@@ -400,7 +437,7 @@ export default function App() {
             <input type="file" accept=".pdf" style={{ display: "none" }} onChange={handlePDFUpload} disabled={loading} />
           </label>
           {note && (
-            <button onClick={() => { setNote(""); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setEditSaved(false); }} style={styles.clearBtn}>Clear</button>
+            <button onClick={() => { setNote(""); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setCurrentTag(null); setEditSaved(false); }} style={styles.clearBtn}>Clear</button>
           )}
         </div>
 
@@ -438,6 +475,39 @@ export default function App() {
                 )}
               </div>
             </div>
+
+            {/* Tag selector — only shown when logged in and a doc is tracked */}
+            {user && currentDocId && !isEditing && (
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+                <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "600" }}>STATUS</span>
+                {TAGS.map((t) => {
+                  const active = currentTag === t.label;
+                  return (
+                    <button
+                      key={t.label}
+                      onClick={() => handleTagChange(t.label)}
+                      style={{
+                        padding: "0.25rem 0.75rem", borderRadius: "99px", fontSize: "12px",
+                        fontWeight: "600", cursor: "pointer", transition: "all 0.15s",
+                        background: active ? t.bg : "white",
+                        color: active ? t.color : "#94a3b8",
+                        border: `1px solid ${active ? t.border : "#e2e8f0"}`,
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+                {currentTag && (
+                  <button
+                    onClick={() => handleTagChange(currentTag)}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "12px", padding: "0 0.25rem" }}
+                  >
+                    ✕ Clear
+                  </button>
+                )}
+              </div>
+            )}
 
             {isEditing && (
               <div style={styles.editingBanner}>✏ Editing mode — correct any AI mistakes, then click Save Changes.</div>
@@ -553,14 +623,18 @@ export default function App() {
                   key={h.id}
                   onClick={() => {
                     setResult(h.result);
-                    setCurrentDocId(h.id); // ← track which doc this is
+                    setCurrentDocId(h.id);
+                    setCurrentTag(h.tag || null);
                     setIsEditing(false);
                     setEditedResult(null);
                     setEditSaved(false);
                   }}
                   style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem 1rem", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                 >
-                  <span style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>{h.result?.patient_name ?? "Unknown"}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                    <span style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>{h.result?.patient_name ?? "Unknown"}</span>
+                    {h.tag && <TagBadge tag={h.tag} size="sm" />}
+                  </div>
                   <span style={{ fontSize: "12px", color: "#94a3b8" }}>{h.result?.date_of_visit ?? ""}</span>
                 </div>
               ))
