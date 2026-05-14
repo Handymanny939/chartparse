@@ -18,6 +18,23 @@ const TAGS = [
   { label: "Billed",   bg: "#dcfce7", color: "#15803d", border: "#86efac" },
 ];
 
+// Print styles — injected once, apply globally via @media print
+const PRINT_STYLES = `
+  @media print {
+    .no-print { display: none !important; }
+    .print-header { display: block !important; }
+    .print-results { margin: 0 !important; padding: 0 !important; }
+    .print-card {
+      break-inside: avoid;
+      box-shadow: none !important;
+      border: 1px solid #e2e8f0 !important;
+    }
+    body { background: white !important; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  .print-header { display: none; }
+`;
+
 function TagBadge({ tag, size = "sm" }) {
   const t = TAGS.find((t) => t.label === tag);
   if (!t) return null;
@@ -82,6 +99,10 @@ const styles = {
   editBtn: {
     padding: "0.5rem 1rem", background: "#eff6ff", border: "1px solid #bfdbfe",
     borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#2563eb", fontWeight: "600"
+  },
+  printBtn: {
+    padding: "0.5rem 1rem", background: "white", border: "1px solid #e2e8f0",
+    borderRadius: "6px", fontSize: "13px", cursor: "pointer", color: "#64748b", fontWeight: "500"
   },
   saveBtn: {
     padding: "0.5rem 1rem", background: "#2563eb", border: "none",
@@ -163,7 +184,7 @@ function SkeletonCard({ full }) {
 
 function Card({ title, color, children, full }) {
   return (
-    <div style={{ ...(full ? styles.cardFull : styles.card), borderTop: `3px solid ${color}` }}>
+    <div className="print-card" style={{ ...(full ? styles.cardFull : styles.card), borderTop: `3px solid ${color}` }}>
       <div style={{ ...styles.cardTitle, color }}>{title}</div>
       {children}
     </div>
@@ -210,8 +231,6 @@ export default function App() {
   const [editSaved, setEditSaved] = useState(false);
 
   const [currentDocId, setCurrentDocId] = useState(null);
-
-  // Current tag for the displayed result
   const [currentTag, setCurrentTag] = useState(null);
 
   const [historySearch, setHistorySearch] = useState("");
@@ -224,9 +243,10 @@ export default function App() {
     return nameMatch && matchesDateFilter(h, historyDateFilter);
   });
 
-  // Tag change — persists immediately to Firestore
+  const handlePrint = () => window.print();
+
   const handleTagChange = async (label) => {
-    const newTag = currentTag === label ? null : label; // clicking active tag clears it
+    const newTag = currentTag === label ? null : label;
     setCurrentTag(newTag);
     if (user && currentDocId) {
       try {
@@ -405,7 +425,10 @@ export default function App() {
 
   return (
     <div style={styles.app}>
-      <header style={styles.header}>
+      {/* Inject print styles once */}
+      <style>{PRINT_STYLES}</style>
+
+      <header className="no-print" style={styles.header}>
         <div><h1 style={styles.logo}>⚕ ChartParse</h1></div>
         <p style={styles.tagline}>AI-powered clinical note parser for solo practices</p>
         {user && (
@@ -418,45 +441,57 @@ export default function App() {
       </header>
 
       <main style={styles.main}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-          <label style={{ ...styles.label, marginBottom: 0 }}>Paste Clinical Note</label>
-          <select onChange={handleSampleLoad} defaultValue="" style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "13px", color: "#374151", background: "white", cursor: "pointer" }}>
-            <option value="" disabled>Load sample note...</option>
-            {Object.keys(SAMPLE_NOTES).map((name) => <option key={name} value={name}>{name}</option>)}
-          </select>
+        {/* Note input — hidden on print */}
+        <div className="no-print">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <label style={{ ...styles.label, marginBottom: 0 }}>Paste Clinical Note</label>
+            <select onChange={handleSampleLoad} defaultValue="" style={{ padding: "0.4rem 0.75rem", borderRadius: "6px", border: "1px solid #e2e8f0", fontSize: "13px", color: "#374151", background: "white", cursor: "pointer" }}>
+              <option value="" disabled>Load sample note...</option>
+              {Object.keys(SAMPLE_NOTES).map((name) => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </div>
+          <textarea rows={10} style={styles.textarea} placeholder="Paste a SOAP note or any clinical note here..." value={note} onChange={(e) => setNote(e.target.value)} />
+          <div style={styles.buttonRow}>
+            <button onClick={handleParse} disabled={loading || !note} style={loading || !note ? styles.parseBtnDisabled : styles.parseBtn}>
+              {loading ? "⏳ Parsing..." : "Parse Note"}
+            </button>
+            <label style={{ ...styles.clearBtn, cursor: "pointer", display: "inline-block" }}>
+              📄 Upload PDF
+              <input type="file" accept=".pdf" style={{ display: "none" }} onChange={handlePDFUpload} disabled={loading} />
+            </label>
+            {note && (
+              <button onClick={() => { setNote(""); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setCurrentTag(null); setEditSaved(false); }} style={styles.clearBtn}>Clear</button>
+            )}
+          </div>
+          {error && <div style={styles.error}>⚠ {error}</div>}
         </div>
-
-        <textarea rows={10} style={styles.textarea} placeholder="Paste a SOAP note or any clinical note here..." value={note} onChange={(e) => setNote(e.target.value)} />
-
-        <div style={styles.buttonRow}>
-          <button onClick={handleParse} disabled={loading || !note} style={loading || !note ? styles.parseBtnDisabled : styles.parseBtn}>
-            {loading ? "⏳ Parsing..." : "Parse Note"}
-          </button>
-          <label style={{ ...styles.clearBtn, cursor: "pointer", display: "inline-block" }}>
-            📄 Upload PDF
-            <input type="file" accept=".pdf" style={{ display: "none" }} onChange={handlePDFUpload} disabled={loading} />
-          </label>
-          {note && (
-            <button onClick={() => { setNote(""); setResult(null); setError(null); setIsEditing(false); setEditedResult(null); setCurrentDocId(null); setCurrentTag(null); setEditSaved(false); }} style={styles.clearBtn}>Clear</button>
-          )}
-        </div>
-
-        {error && <div style={styles.error}>⚠ {error}</div>}
 
         {loading && (
-          <>
+          <div className="no-print">
             <div style={{ ...styles.resultsHeader, marginTop: "2rem" }}>
               <div style={{ ...styles.skeletonLine, height: "18px", width: "150px" }} />
             </div>
             <div style={styles.grid}>
               <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard full />
             </div>
-          </>
+          </div>
         )}
 
         {display && (
           <>
-            <div style={styles.resultsHeader}>
+            {/* Print-only header — hidden on screen, shown on print */}
+            <div className="print-header" style={{ marginBottom: "1.5rem", paddingBottom: "1rem", borderBottom: "2px solid #e2e8f0" }}>
+              <div style={{ fontSize: "20px", fontWeight: "700", color: "#1e293b" }}>⚕ ChartParse — Parsed Note</div>
+              <div style={{ fontSize: "14px", color: "#64748b", marginTop: "0.25rem" }}>
+                {display.patient_name} · {display.date_of_visit}
+                {currentTag && (
+                  <span style={{ marginLeft: "0.75rem" }}><TagBadge tag={currentTag} /></span>
+                )}
+              </div>
+            </div>
+
+            {/* Results header — hidden on print */}
+            <div className="no-print" style={styles.resultsHeader}>
               <h2 style={styles.resultsTitle}>Extracted Data</h2>
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 {!isEditing ? (
@@ -464,6 +499,7 @@ export default function App() {
                     <button onClick={handleEditStart} style={styles.editBtn}>✏ Edit Results</button>
                     <button onClick={handleCopy} style={styles.copyBtn}>{copied ? "✓ Copied!" : "Copy JSON"}</button>
                     <button onClick={handleDownloadCSV} style={{ ...styles.copyBtn, background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>↓ Download CSV</button>
+                    <button onClick={handlePrint} style={styles.printBtn}>🖨 Print</button>
                   </>
                 ) : (
                   <>
@@ -476,33 +512,26 @@ export default function App() {
               </div>
             </div>
 
-            {/* Tag selector — only shown when logged in and a doc is tracked */}
+            {/* Tag selector — hidden on print */}
             {user && currentDocId && !isEditing && (
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+              <div className="no-print" style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "1rem" }}>
                 <span style={{ fontSize: "12px", color: "#94a3b8", fontWeight: "600" }}>STATUS</span>
                 {TAGS.map((t) => {
                   const active = currentTag === t.label;
                   return (
-                    <button
-                      key={t.label}
-                      onClick={() => handleTagChange(t.label)}
-                      style={{
-                        padding: "0.25rem 0.75rem", borderRadius: "99px", fontSize: "12px",
-                        fontWeight: "600", cursor: "pointer", transition: "all 0.15s",
-                        background: active ? t.bg : "white",
-                        color: active ? t.color : "#94a3b8",
-                        border: `1px solid ${active ? t.border : "#e2e8f0"}`,
-                      }}
-                    >
+                    <button key={t.label} onClick={() => handleTagChange(t.label)} style={{
+                      padding: "0.25rem 0.75rem", borderRadius: "99px", fontSize: "12px",
+                      fontWeight: "600", cursor: "pointer", transition: "all 0.15s",
+                      background: active ? t.bg : "white",
+                      color: active ? t.color : "#94a3b8",
+                      border: `1px solid ${active ? t.border : "#e2e8f0"}`,
+                    }}>
                       {t.label}
                     </button>
                   );
                 })}
                 {currentTag && (
-                  <button
-                    onClick={() => handleTagChange(currentTag)}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "12px", padding: "0 0.25rem" }}
-                  >
+                  <button onClick={() => handleTagChange(currentTag)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "12px", padding: "0 0.25rem" }}>
                     ✕ Clear
                   </button>
                 )}
@@ -510,13 +539,13 @@ export default function App() {
             )}
 
             {isEditing && (
-              <div style={styles.editingBanner}>✏ Editing mode — correct any AI mistakes, then click Save Changes.</div>
+              <div className="no-print" style={styles.editingBanner}>✏ Editing mode — correct any AI mistakes, then click Save Changes.</div>
             )}
             {editSaved && !isEditing && (
-              <div style={styles.savedBanner}>✓ Edits saved successfully.</div>
+              <div className="no-print" style={styles.savedBanner}>✓ Edits saved successfully.</div>
             )}
 
-            <div style={styles.grid}>
+            <div className="print-results" style={styles.grid}>
               <Card title="Patient Info" color="#2563eb">
                 <Field label="Name" value={display.patient_name} editable={isEditing} onChange={(v) => updateField("patient_name", v)} />
                 <Field label="Date of Visit" value={display.date_of_visit} editable={isEditing} onChange={(v) => updateField("date_of_visit", v)} />
@@ -598,8 +627,9 @@ export default function App() {
         )}
       </main>
 
+      {/* History — hidden on print */}
       {history.length > 0 && (
-        <aside style={{ maxWidth: "860px", margin: "0 auto", padding: "0 1.5rem 3rem" }}>
+        <aside className="no-print" style={{ maxWidth: "860px", margin: "0 auto", padding: "0 1.5rem 3rem" }}>
           <h2 style={{ fontSize: "16px", fontWeight: "700", color: "#1e293b", marginBottom: "0.75rem" }}>Recent Parses</h2>
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.6rem" }}>
             <input type="text" placeholder="Search by patient name..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} style={styles.historySearch} />
@@ -621,14 +651,7 @@ export default function App() {
               filteredHistory.slice(0, 20).map((h) => (
                 <div
                   key={h.id}
-                  onClick={() => {
-                    setResult(h.result);
-                    setCurrentDocId(h.id);
-                    setCurrentTag(h.tag || null);
-                    setIsEditing(false);
-                    setEditedResult(null);
-                    setEditSaved(false);
-                  }}
+                  onClick={() => { setResult(h.result); setCurrentDocId(h.id); setCurrentTag(h.tag || null); setIsEditing(false); setEditedResult(null); setEditSaved(false); }}
                   style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem 1rem", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
